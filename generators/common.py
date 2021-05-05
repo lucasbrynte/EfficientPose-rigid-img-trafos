@@ -76,7 +76,8 @@ class Generator(keras.utils.Sequence):
         self.group_method = group_method
         self.shuffle_groups = shuffle_groups
         self.image_size = image_sizes[phi]
-        self.groups = None
+        # self.groups = None
+        self._groups = None
         self.anchor_parameters = AnchorParameters.default
         self.anchors, self.translation_anchors = anchors_for_shape((self.image_size, self.image_size), anchor_params = self.anchor_parameters)
         self.num_anchors = self.anchor_parameters.num_anchors()
@@ -93,12 +94,12 @@ class Generator(keras.utils.Sequence):
         else:
             self.rand_aug = None
 
-        # Define groups
-        self.group_images()
-
-        # Shuffle when initializing
-        if self.shuffle_groups:
-            random.shuffle(self.groups)
+        # # Define groups
+        # self.group_images()
+        # 
+        # # Shuffle when initializing
+        # if self.shuffle_groups:
+        #     random.shuffle(self.groups)
             
         self.all_3d_model_points_array_for_loss = self.create_all_3d_model_points_array_for_loss(self.class_to_model_3d_points, self.points_for_shape_match_loss)
         
@@ -797,9 +798,19 @@ class Generator(keras.utils.Sequence):
             order.sort(key=lambda x: self.image_aspect_ratio(x))
 
         # divide into groups, one group = one batch
-        self.groups = [[order[x % len(order)] for x in range(i, i + self.batch_size)] for i in
-                       range(0, len(order), self.batch_size)]
+        self._groups = [[order[x % len(order)] for x in range(i, i + self.batch_size)] for i in
+                         range(0, len(order), self.batch_size)]
 
+    @property
+    def groups(self):
+        if self._groups is None:
+            self.group_images()
+
+            # Shuffle when initializing
+            if self.shuffle_groups:
+                random.shuffle(self._groups)
+
+        return self._groups
 
     def __len__(self):
         """
