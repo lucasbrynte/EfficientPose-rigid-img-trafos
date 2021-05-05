@@ -115,6 +115,9 @@ class LineModGenerator(Generator):
         #create dict with the class indices/names as keys and model 3d bboxes as values
         self.class_to_model_3d_bboxes, self.name_to_model_3d_bboxes = self.create_model_3d_bboxes_dict(self.all_models_dict, self.object_ids_to_class_labels, self.class_to_name)
         
+        #init base class
+        Generator.__init__(self, **kwargs)
+        
         #get the final input and annotation infos for the base generator
         self.image_paths, self.mask_paths, self.depth_paths, self.annotations, self.infos = self.prepare_dataset(self.object_path, self.data_examples, self.gt_dict, self.info_dict)
         
@@ -122,9 +125,6 @@ class LineModGenerator(Generator):
         if self.shuffle_dataset:
             self.image_paths, self.mask_paths, self.depth_paths, self.annotations, self.infos = self.shuffle_sequences(self.image_paths, self.mask_paths, self.depth_paths, self.annotations, self.infos)
             
-        
-        #init base class
-        Generator.__init__(self, **kwargs)
         
     
     def get_bbox_3d(self, model_dict):
@@ -345,13 +345,20 @@ class LineModGenerator(Generator):
             infos: List with all info dictionaries (intrinsic camera parameters) in the dataset split
     
         """
-        all_images_path = os.path.join(object_path, "rgb")
+        if self.radial_arctan_prewarped_images:
+            all_images_path = os.path.join(object_path, "rgb_arctan_warped")
+        else:
+            all_images_path = os.path.join(object_path, "rgb")
         
         #load all images which are in the dataset split (train/test)
         all_filenames = [filename for filename in os.listdir(all_images_path) if self.image_extension in filename and filename.replace(self.image_extension, "") in data_examples]
         image_paths = [os.path.join(all_images_path, filename) for filename in all_filenames]
-        mask_paths = [img_path.replace("rgb", "mask") for img_path in image_paths]
-        depth_paths = [img_path.replace("rgb", "depth") for img_path in image_paths]
+        if self.radial_arctan_prewarped_images:
+            mask_paths = [img_path.replace("rgb", "mask") for img_path in image_paths]
+            depth_paths = [None for img_path in image_paths]
+        else:
+            mask_paths = [img_path.replace("rgb", "mask") for img_path in image_paths]
+            depth_paths = [img_path.replace("rgb", "depth") for img_path in image_paths]
         
         #parse the example ids for the gt dict from filenames
         example_ids = [int(filename.split(".")[0]) for filename in all_filenames]

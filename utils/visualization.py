@@ -41,6 +41,7 @@ import cv2
 import numpy as np
 
 from utils.colors import label_color
+from utils.transform import radial_arctan_transform
 
 
 def draw_box(image, box, color, thickness = 2):
@@ -116,7 +117,16 @@ def draw_bbox_8_2D(draw_img, bbox_8_2D, color = (0, 255, 0), thickness = 2):
         cv2.circle(draw_img, bbox[8], 3, color, -1)
     
     
-def project_bbox_3D_to_2D(points_bbox_3D, rotation_vector, translation_vector, camera_matrix, append_centerpoint = True):
+def project_bbox_3D_to_2D(
+    points_bbox_3D,
+    rotation_vector,
+    translation_vector,
+    camera_matrix,
+    append_centerpoint = True,
+    radial_arctan_prewarped_images = False,
+    one_based_indexing_for_prewarp = True,
+    original_image_shape = None,
+):
     """ Projects the 3D model's cuboid onto a 2D image plane with the given rotation, translation and camera matrix.
 
     Arguments:
@@ -132,12 +142,45 @@ def project_bbox_3D_to_2D(points_bbox_3D, rotation_vector, translation_vector, c
         points_bbox_3D = np.concatenate([points_bbox_3D, np.zeros(shape = (1, 3))], axis = 0)
     points_bbox_2D, jacobian = cv2.projectPoints(points_bbox_3D, rotation_vector, translation_vector, camera_matrix, None)
     points_bbox_2D = np.squeeze(points_bbox_2D)
-    
+
+    if radial_arctan_prewarped_images:
+        assert len(points_bbox_2D.shape) == 2
+        assert points_bbox_2D.shape[0] == 2
+        assert np.isclose(camera_matrix[2,2], 1)
+        points_bbox_2D = radial_arctan_transform(
+            # points_bbox_2D,
+            points_bbox_2D[0,:], # x
+            points_bbox_2D[1,:], # y
+            camera_matrix[0,0], # fx
+            camera_matrix[1,1], # fy
+            camera_matrix[0,2], # px
+            camera_matrix[1,2], # py
+            one_based_indexing_for_prewarp,
+            original_image_shape,
+        )
+
     return points_bbox_2D
     
 
 
-def draw_detections(image, boxes, scores, labels, rotations, translations, class_to_bbox_3D, camera_matrix, color = None, label_to_name = None, score_threshold = 0.5, draw_bbox_2d = False, draw_name = False):
+def draw_detections(
+    image,
+    boxes,
+    scores,
+    labels,
+    rotations,
+    translations,
+    class_to_bbox_3D,
+    camera_matrix,
+    color = None,
+    label_to_name = None,
+    score_threshold = 0.5,
+    draw_bbox_2d = False,
+    draw_name = False,
+    radial_arctan_prewarped_images = False,
+    one_based_indexing_for_prewarp = True,
+    original_image_shape = None,
+):
     """ Draws detections in an image.
 
     # Arguments
@@ -163,7 +206,16 @@ def draw_detections(image, boxes, scores, labels, rotations, translations, class
         if draw_bbox_2d:
             draw_box(image, boxes[i, :], color = c)
         translation_vector = translations[i, :]
-        points_bbox_2D = project_bbox_3D_to_2D(class_to_bbox_3D[labels[i]], rotations[i, :], translation_vector, camera_matrix, append_centerpoint = True)
+        points_bbox_2D = project_bbox_3D_to_2D(
+            class_to_bbox_3D[labels[i]],
+            rotations[i, :],
+            translation_vector,
+            camera_matrix,
+            append_centerpoint = True,
+            radial_arctan_prewarped_images = radial_arctan_prewarped_images,
+            one_based_indexing_for_prewarp = one_based_indexing_for_prewarp,
+            original_image_shape = original_image_shape,
+        )
         draw_bbox_8_2D(image, points_bbox_2D, color = c)
         if draw_name:
             if isinstance(label_to_name, dict):
@@ -174,7 +226,19 @@ def draw_detections(image, boxes, scores, labels, rotations, translations, class
             draw_caption(image, boxes[i, :], caption)
 
 
-def draw_annotations(image, annotations, class_to_bbox_3D, camera_matrix, color = (0, 255, 0), label_to_name = None, draw_bbox_2d = False, draw_name = False):
+def draw_annotations(
+    image,
+    annotations,
+    class_to_bbox_3D,
+    camera_matrix,
+    color = (0, 255, 0),
+    label_to_name = None,
+    draw_bbox_2d = False,
+    draw_name = False,
+    radial_arctan_prewarped_images = False,
+    one_based_indexing_for_prewarp = True,
+    original_image_shape = None,
+):
     """ Draws annotations in an image.
 
     # Arguments
@@ -203,7 +267,16 @@ def draw_annotations(image, annotations, class_to_bbox_3D, camera_matrix, color 
         if draw_bbox_2d:
             draw_box(image, annotations['bboxes'][i], color = (0, 127, 0))
         caption = '{}'.format(label_to_name(label) if label_to_name else label)
-        points_bbox_2D = project_bbox_3D_to_2D(class_to_bbox_3D[annotations["labels"][i]], annotations['rotations'][i, :3], annotations['translations'][i, :], camera_matrix, append_centerpoint = True)
+        points_bbox_2D = project_bbox_3D_to_2D(
+            class_to_bbox_3D[annotations["labels"][i]],
+            annotations['rotations'][i, :3],
+            annotations['translations'][i, :],
+            camera_matrix,
+            append_centerpoint = True,
+            radial_arctan_prewarped_images = radial_arctan_prewarped_images,
+            one_based_indexing_for_prewarp = one_based_indexing_for_prewarp,
+            original_image_shape = original_image_shape,
+        )
         draw_bbox_8_2D(image, points_bbox_2D, color = color)
         if draw_name:
             if isinstance(label_to_name, dict):

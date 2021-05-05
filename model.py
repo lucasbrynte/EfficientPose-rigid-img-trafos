@@ -63,7 +63,11 @@ def build_EfficientPose(phi,
                         score_threshold = 0.5,
                         anchor_parameters = None,
                         num_rotation_parameters = 3,
-                        print_architecture = True):
+                        print_architecture = True,
+                        radial_arctan_prewarped_images = False,
+                        one_based_indexing_for_prewarp = True,
+                        original_image_shape = None,
+                    ):
     """
     Builds an EfficientPose model
     Args:
@@ -124,7 +128,11 @@ def build_EfficientPose(phi,
                                                                                                                    image_input,
                                                                                                                    camera_parameters_input,
                                                                                                                    input_size,
-                                                                                                                   anchor_parameters)
+                                                                                                                   anchor_parameters,
+                                                                                                                   radial_arctan_prewarped_images = radial_arctan_prewarped_images,
+                                                                                                                   one_based_indexing_for_prewarp = one_based_indexing_for_prewarp,
+                                                                                                                   original_image_shape = original_image_shape,
+                                                                                                               )
     
     
     #get the EfficientPose model for training without NMS and the rotation and translation output combined in the transformation output because of the loss calculation
@@ -766,7 +774,7 @@ class TranslationNet(models.Model):
         return outputs
     
 
-def apply_subnets_to_feature_maps(box_net, class_net, rotation_net, translation_net, fpn_feature_maps, image_input, camera_parameters_input, input_size, anchor_parameters):
+def apply_subnets_to_feature_maps(box_net, class_net, rotation_net, translation_net, fpn_feature_maps, image_input, camera_parameters_input, input_size, anchor_parameters, radial_arctan_prewarped_images=False, one_based_indexing_for_prewarp=True, original_image_shape=None):
     """
     Applies the subnetworks to the BiFPN feature maps
     Args:
@@ -803,13 +811,15 @@ def apply_subnets_to_feature_maps(box_net, class_net, rotation_net, translation_
     
     translation_xy_Tz = RegressTranslation(name = 'translation_regression')([translation_anchors_input, translation_raw])
     translation = CalculateTxTy(name = 'translation')(translation_xy_Tz,
+                                                        radial_arctan_prewarped_images,
+                                                        one_based_indexing_for_prewarp,
+                                                        original_image_shape,
                                                         fx = camera_parameters_input[:, 0],
                                                         fy = camera_parameters_input[:, 1],
                                                         px = camera_parameters_input[:, 2],
                                                         py = camera_parameters_input[:, 3],
                                                         tz_scale = camera_parameters_input[:, 4],
                                                         image_scale = camera_parameters_input[:, 5])
-    
     # apply predicted 2D bbox regression to anchors
     anchors_input = np.expand_dims(anchors, axis = 0)
     bboxes = RegressBoxes(name='boxes')([anchors_input, bbox_regression[..., :4]])

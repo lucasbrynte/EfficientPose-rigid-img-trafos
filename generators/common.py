@@ -31,6 +31,7 @@ import math
 from tensorflow import keras
 
 from utils.anchors import anchors_for_shape, anchor_targets_bbox, AnchorParameters
+from utils.transform import radial_arctan_transform
 from generators.randaug import RandAugment
 
 
@@ -54,6 +55,9 @@ class Generator(keras.utils.Sequence):
             rotation_representation = "axis_angle",
             group_method='random',  # one of 'none', 'random', 'ratio'
             shuffle_groups = True,
+            radial_arctan_prewarped_images = False,
+            one_based_indexing_for_prewarp = True,
+            original_image_shape = None,
     ):
         """
         Initialize Generator object.
@@ -93,6 +97,10 @@ class Generator(keras.utils.Sequence):
             self.rand_aug = RandAugment(n = (1, 3), m = (1, 14))
         else:
             self.rand_aug = None
+
+        self.radial_arctan_prewarped_images = radial_arctan_prewarped_images
+        self.one_based_indexing_for_prewarp = one_based_indexing_for_prewarp
+        self.original_image_shape = original_image_shape
 
         # # Define groups
         # self.group_images()
@@ -730,9 +738,27 @@ class Generator(keras.utils.Sequence):
         Returns:
             points_2D: numpy array with shape (num_points, 2) with the 2D projections of the given 3D points
         """
+        assert len(points_3D.shape) in [1, 2] and points_3D.shape[-1] == 3
+        points_3D = points_3D.reshape((-1, 3))
         points_2D, jacobian = cv2.projectPoints(points_3D, rotation_vector, translation_vector, camera_matrix, None)
         points_2D = np.squeeze(points_2D)
-    
+
+        if self.radial_arctan_prewarped_images:
+            assert len(points_2D.shape) in [1, 2] and points_2D.shape[-1] == 2
+            points_2D = points_2D.reshape((2, -1))
+            assert np.isclose(camera_matrix[2,2], 1)
+            points_2D = radial_arctan_transform(
+                # points_2D,
+                points_2D[0,:], # x
+                points_2D[1,:], # y
+                camera_matrix[0,0], # fx
+                camera_matrix[1,1], # fy
+                camera_matrix[0,2], # px
+                camera_matrix[1,2], # py
+                self.one_based_indexing_for_prewarp,
+                self.original_image_shape,
+            )
+
         return points_2D
     
     

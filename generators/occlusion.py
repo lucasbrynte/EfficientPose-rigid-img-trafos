@@ -127,15 +127,15 @@ class OcclusionGenerator(Generator):
         #load 3d points for all models and store it in two dicts: one with class idx as keys and the other one with the model names as keys
         self.class_to_model_3d_points, self.name_to_model_3d_points = self.load_model_3d_points(self.model_path, self.object_ids, self.name_to_class)
         
+        #init base class
+        Generator.__init__(self, **kwargs)
+        
         #get the final input and annotation infos for the base generator
         self.image_paths, self.mask_paths, self.depth_paths, self.annotations, self.infos = self.prepare_dataset(self.object_path, self.data_examples, self.gt_dict, self.info_dict, self.class_to_valid_examples)
         
         #shuffle dataset
         if self.shuffle_dataset:
             self.image_paths, self.mask_paths, self.depth_paths, self.annotations, self.infos = self.shuffle_sequences(self.image_paths, self.mask_paths, self.depth_paths, self.annotations, self.infos)
-        
-        #init base class
-        Generator.__init__(self, **kwargs)
         
         
     def map_object_ids_to_class_labels(self, object_ids_dict, name_to_class_dict):

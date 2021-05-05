@@ -22,7 +22,7 @@ EfficientNet Keras implementation (https://github.com/qubvel/efficientnet) licen
 ---------------------------------------------------------------------------------------------------------------------------------
 Keras RetinaNet implementation (https://github.com/fizyr/keras-retinanet) licensed under the Apache License, Version 2.0
 """
-
+import numpy as np
 # import keras
 from tensorflow import keras
 import tensorflow as tf
@@ -219,10 +219,90 @@ class CalculateTxTy(keras.layers.Layer):
         """
         super(CalculateTxTy, self).__init__(*args, **kwargs)
 
-    def call(self, inputs, fx = 572.4114, fy = 573.57043, px = 325.2611, py = 242.04899, tz_scale = 1000.0, image_scale = 1.6666666666666667, **kwargs):
+    def calculate_image_border_angles(self, fx, fy, px, py, one_based_indexing_for_prewarp, original_image_shape):
+        mm = original_image_shape[0] # Height
+        nn = original_image_shape[1] # Width
+
+        bs = tf.shape(fx)[0]
+
+        # Define 2D points mid-way along image borders, in homogeneous coordinates.
+        # These are the points that are invariant to the arctan warping.
+
+        # xx = np.array([
+        #     [px,  1, 1], # Left
+        #     [px, mm, 1], # Right
+        #     [1,  py, 1], # Up
+        #     [nn, py, 1], # Down
+        # ]).T
+
+        # 4 x homogeneous 2D points:
+        # xx shape: (bs, 3, 4)
+        xx = tf.concat([
+            tf.concat([tf.reshape(px, (bs,1,1)),            tf.ones((bs,1,1)),    tf.ones((bs,1,1))], axis=1), # Left: [px,  1, 1]
+            tf.concat([tf.reshape(px, (bs,1,1)),         mm*tf.ones((bs,1,1)),    tf.ones((bs,1,1))], axis=1), # Right: [px, mm, 1]
+            tf.concat([       tf.ones((bs,1,1)),     tf.reshape(py, (bs,1,1)),    tf.ones((bs,1,1))], axis=1), # Up: [1,  py, 1]
+            tf.concat([    nn*tf.ones((bs,1,1)),     tf.reshape(py, (bs,1,1)),    tf.ones((bs,1,1))], axis=1), # Down: [nn, py, 1]
+        ], axis=2)
+        # if not one_based_indexing_for_prewarp:
+        #     xx = tf.concat([xx[:,:2,:]-1, xx[:,[2],:]], axis=1)
+        # print(xx)
+        x, y, w = xx[:,0,:], xx[:,1,:], xx[:,2,:]
+        if not one_based_indexing_for_prewarp:
+            x = x - 1
+            y = y - 1
+
+        # Apply inv(K). Note: w coordinate remains unchanged (=1).
+        x = (x - px) / fx
+        y = (y - py) / fy
+
+        # Backproject 2D point to unit sphere, and determine w coordinate after normalization
+        w_component_norm = w / tf.sqrt(x**2 + y**2 + w**2)
+
+        angles = tf.math.acos(w_component_norm)
+        thx_min = -angles[:,0]
+        thx_max =  angles[:,1]
+        thy_min = -angles[:,2]
+        thy_max =  angles[:,3]
+
+        return thx_min, thx_max, thy_min, thy_max
+
+    def radial_tangent_transform(self, x, y, fx, fy, px, py, one_based_indexing_for_prewarp, original_image_shape):
+        thx_min, thx_max, thy_min, thy_max = self.calculate_image_border_angles(fx, fy, px, py, one_based_indexing_for_prewarp, original_image_shape)
+        with tf.control_dependencies([tf.assert_greater(thx_max, thx_min)]):
+            thx_max = 1.*thx_max
+        with tf.control_dependencies([tf.assert_greater(thy_max, thy_min)]):
+            thy_max = 1.*thy_max
+
+        # inputs shape: (batch, n_anchors, 3)
+        if one_based_indexing_for_prewarp:
+            x = x + 1
+            y = y + 1
+
+        # Apply inv(K)
+        x = (x - px) / fx
+        y = (y - py) / fy
+
+        # Rescale vector norm r -> tan(r) unless close to zero. In that case, norm remains untouched, which is sound due to r ~ tan(r) for small r.
+        xy_norm = tf.sqrt(x**2 + y**2)
+        non_singular_mask = xy_norm >= 1e-4
+        x = tf.where(non_singular_mask, x=x*tf.tan(xy_norm)/xy_norm, y=x)
+        y = tf.where(non_singular_mask, x=y*tf.tan(xy_norm)/xy_norm, y=y)
+
+        # Linearly map from angular range to [0, 1] interval
+        x = (x - thx_min) / (thx_max - thx_min)
+        y = (y - thy_min) / (thy_max - thy_min)
+
+        # Map to [0, N-1] range
+        # Note: This behavior should be identical independent of the "one_based_indexing_for_prewarp" flag, since the output coordinates should be zero-based.
+        x = x * (original_image_shape[1] - 1)
+        y = y * (original_image_shape[0] - 1)
+
+        return x, y
+
+    def call(self, inputs, radial_arctan_prewarped_images, one_based_indexing_for_prewarp, original_image_shape, fx = 572.4114, fy = 573.57043, px = 325.2611, py = 242.04899, tz_scale = 1000.0, image_scale = 1.6666666666666667, **kwargs):
         # Tx = (cx - px) * Tz / fx
         # Ty = (cy - py) * Tz / fy
-        
+
         fx = tf.expand_dims(fx, axis = -1)
         fy = tf.expand_dims(fy, axis = -1)
         px = tf.expand_dims(px, axis = -1)
@@ -233,12 +313,16 @@ class CalculateTxTy(keras.layers.Layer):
         x = inputs[:, :, 0] / image_scale
         y = inputs[:, :, 1] / image_scale
         tz = inputs[:, :, 2] * tz_scale
-        
-        x = x - px
-        y = y - py
-        
-        tx = tf.math.multiply(x, tz) / fx
-        ty = tf.math.multiply(y, tz) / fy
+
+        if radial_arctan_prewarped_images:
+            x, y = self.radial_tangent_transform(x, y, fx, fy, px, py, one_based_indexing_for_prewarp, original_image_shape)
+
+        # Apply inv(K)
+        x = (x - px) / fx
+        y = (y - py) / fy
+
+        tx = tf.math.multiply(x, tz)
+        ty = tf.math.multiply(y, tz)
         
         output = tf.stack([tx, ty, tz], axis = -1)
         

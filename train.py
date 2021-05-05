@@ -95,7 +95,12 @@ def parse_args(args):
     parser.add_argument('--multiprocessing', help = 'Use multiprocessing in fit_generator.', action = 'store_true')
     parser.add_argument('--workers', help = 'Number of generator workers.', type = int, default = 4)
     parser.add_argument('--max-queue-size', help = 'Queue length for multiprocessing workers in fit_generator.', type = int, default = 10)
-    
+
+    parser.add_argument('--radial-arctan-prewarped-images', help = 'Indicates that input images have been subject to a warp operation, where every point has been transformed such that the radial distance r to the principal point is replaced by arctan(r), resulting in an equiangular grid, in the sense of camera rotations.', action = 'store_true')
+    parser.add_argument('--one-based-indexing-for-prewarp', help = 'When prewarping the images, one based indexing rather than zero based indexing was assumed.', action = 'store_true')
+    parser.add_argument('--image-width', help = 'Image width', required = False, type = int)
+    parser.add_argument('--image-height', help = 'Image height', required = False, type = int)
+
     print(vars(parser.parse_args(args)))
     return parser.parse_args(args)
 
@@ -134,7 +139,11 @@ def main(args = None):
                                                               num_anchors = num_anchors,
                                                               freeze_bn = not args.no_freeze_bn,
                                                               score_threshold = args.score_threshold,
-                                                              num_rotation_parameters = num_rotation_parameters)
+                                                              num_rotation_parameters = num_rotation_parameters,
+                                                              radial_arctan_prewarped_images = args.radial_arctan_prewarped_images,
+                                                              one_based_indexing_for_prewarp = args.one_based_indexing_for_prewarp,
+                                                              original_image_shape = (args.image_height, args.image_width),
+                                                          )
     print("Done!")
     # load pretrained weights
     if args.weights:
@@ -324,6 +333,9 @@ def create_generators(args):
             rotation_representation = args.rotation_representation,
             use_colorspace_augmentation = not args.no_color_augmentation,
             use_6DoF_augmentation = not args.no_6dof_augmentation,
+            radial_arctan_prewarped_images = args.radial_arctan_prewarped_images,
+            one_based_indexing_for_prewarp = args.one_based_indexing_for_prewarp,
+            original_image_shape = (args.image_height, args.image_width),
             **common_args
         )
 
@@ -336,6 +348,9 @@ def create_generators(args):
             rotation_representation = args.rotation_representation,
             use_colorspace_augmentation = False,
             use_6DoF_augmentation = False,
+            radial_arctan_prewarped_images = args.radial_arctan_prewarped_images,
+            one_based_indexing_for_prewarp = args.one_based_indexing_for_prewarp,
+            original_image_shape = (args.image_height, args.image_width),
             **common_args
         )
     elif args.dataset_type == 'occlusion':
@@ -345,6 +360,9 @@ def create_generators(args):
             rotation_representation = args.rotation_representation,
             use_colorspace_augmentation = not args.no_color_augmentation,
             use_6DoF_augmentation = not args.no_6dof_augmentation,
+            radial_arctan_prewarped_images = args.radial_arctan_prewarped_images,
+            one_based_indexing_for_prewarp = args.one_based_indexing_for_prewarp,
+            original_image_shape = (args.image_height, args.image_width),
             **common_args
         )
 
@@ -356,6 +374,9 @@ def create_generators(args):
             rotation_representation = args.rotation_representation,
             use_colorspace_augmentation = False,
             use_6DoF_augmentation = False,
+            radial_arctan_prewarped_images = args.radial_arctan_prewarped_images,
+            one_based_indexing_for_prewarp = args.one_based_indexing_for_prewarp,
+            original_image_shape = (args.image_height, args.image_width),
             **common_args
         )
     else:

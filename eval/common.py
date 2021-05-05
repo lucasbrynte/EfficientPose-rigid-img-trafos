@@ -143,8 +143,30 @@ def _get_detections(generator, model, score_threshold = 0.05, max_detections = 1
 
         if save_path is not None:
             raw_image = cv2.cvtColor(raw_image, cv2.COLOR_RGB2BGR)
-            draw_annotations(raw_image, generator.load_annotations(i), class_to_bbox_3D = generator.get_bbox_3d_dict(), camera_matrix = generator.load_camera_matrix(i), label_to_name=generator.label_to_name)
-            draw_detections(raw_image, image_boxes, image_scores, image_labels, image_rotations, image_translations, class_to_bbox_3D = generator.get_bbox_3d_dict(), camera_matrix = generator.load_camera_matrix(i), label_to_name=generator.label_to_name)
+            draw_annotations(
+                raw_image,
+                generator.load_annotations(i),
+                class_to_bbox_3D = generator.get_bbox_3d_dict(),
+                camera_matrix = generator.load_camera_matrix(i),
+                label_to_name = generator.label_to_name,
+                radial_arctan_prewarped_images = generator.radial_arctan_prewarped_images,
+                one_based_indexing_for_prewarp = generator.one_based_indexing_for_prewarp,
+                original_image_shape = generator.original_image_shape,
+            )
+            draw_detections(
+                raw_image,
+                image_boxes,
+                image_scores,
+                image_labels,
+                image_rotations,
+                image_translations,
+                class_to_bbox_3D = generator.get_bbox_3d_dict(),
+                camera_matrix = generator.load_camera_matrix(i),
+                label_to_name = generator.label_to_name,
+                radial_arctan_prewarped_images = generator.radial_arctan_prewarped_images,
+                one_based_indexing_for_prewarp = generator.one_based_indexing_for_prewarp,
+                original_image_shape = generator.original_image_shape,
+            )
 
             cv2.imwrite(os.path.join(save_path, '{}.png'.format(i)), raw_image)
 
