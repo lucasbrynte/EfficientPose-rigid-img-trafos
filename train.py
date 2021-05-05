@@ -84,6 +84,9 @@ def parse_args(args):
     parser.add_argument('--epochs', help = 'Number of epochs to train.', type = int, default = 500)
     parser.add_argument('--steps', help = 'Number of steps per epoch.', type = int, default = int(179 * 10))
     parser.add_argument('--snapshot-path', help = 'Path to store snapshots of models during training', default = os.path.join("checkpoints", date_and_time))
+    parser.add_argument('--snapshot-interval', help = 'Snapshot interval (#epochs). If provided, not only the best snapshot is saved, but also snapshots with the given interval.', type = int, default = None)
+    parser.add_argument('--csv-log-path', help = 'Path to stream results as CSV.', default = None)
+    parser.add_argument('--history-dump-path', help = 'Path to dump final history dictionary as JSON.', default = None)
     parser.add_argument('--tensorboard-dir', help = 'Log directory for Tensorboard output', default = os.path.join("logs", date_and_time))
     parser.add_argument('--no-snapshots', help = 'Disable saving snapshots.', dest = 'snapshots', action = 'store_false')
     parser.add_argument('--no-evaluation', help = 'Disable per epoch evaluation.', dest = 'evaluation', action = 'store_false')
@@ -191,7 +194,7 @@ def main(args = None):
         raise ValueError('When you have no validation data, you should not specify --compute-val-loss.')
 
     # start training
-    return model.fit_generator(
+    history = model.fit_generator(
         generator = train_generator,
         steps_per_epoch = args.steps,
         initial_epoch = 0,
@@ -203,6 +206,10 @@ def main(args = None):
         max_queue_size = args.max_queue_size,
         validation_data = validation_generator
     )
+    if args.history_dump_path is not None:
+        with open(args.history_dump_path, 'w') as f:
+            json.dump(history.history, f)
+    return history
 
 
 def allow_gpu_growth_memory():
@@ -289,13 +296,20 @@ def create_callbacks(training_model, prediction_model, validation_generator, arg
     if args.snapshots:
         # ensure directory created first; otherwise h5py will error after epoch.
         os.makedirs(snapshot_path, exist_ok = True)
-        checkpoint = keras.callbacks.ModelCheckpoint(os.path.join(snapshot_path, 'phi_{phi}_{dataset_type}_best_{metric}.h5'.format(phi = str(args.phi), metric = metric_to_monitor, dataset_type = args.dataset_type)),
+        save_best_only = args.snapshot_interval is None
+        checkpoint = keras.callbacks.ModelCheckpoint(os.path.join(snapshot_path, 'epoch_{{epoch:02d}}_phi_{phi}_{dataset_type}_{metric}_{{{metric}:.02f}}{best_suffix}.h5'.format(phi = str(args.phi), metric = metric_to_monitor, best_suffix = '_best_{metric}' if save_best_only else ''.format(metric = metric_to_monitor), dataset_type = args.dataset_type)),
                                                      verbose = 1,
                                                      #save_weights_only = True,
-                                                     save_best_only = True,
+                                                     # save_best_only = True,
+                                                     save_best_only = save_best_only,
+                                                     period = args.snapshot_interval,
                                                      monitor = metric_to_monitor,
                                                      mode = mode)
         callbacks.append(checkpoint)
+
+
+    if args.csv_log_path is not None:
+        callbacks.append(keras.callbacks.CSVLogger(args.csv_log_path))
 
     callbacks.append(keras.callbacks.ReduceLROnPlateau(
         monitor    = 'MixedAveragePointDistanceMean_in_mm',
