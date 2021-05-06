@@ -82,8 +82,9 @@ def parse_args(args):
     parser.add_argument('--phi', help = 'Hyper parameter phi', default = 0, type = int, choices = (0, 1, 2, 3, 4, 5, 6))
     parser.add_argument('--gpu', help = 'Id of the GPU to use (as reported by nvidia-smi).')
     parser.add_argument('--epochs', help = 'Number of epochs to train.', type = int, default = 500)
-    parser.add_argument('--steps', help = 'Number of steps per epoch.', type = int, default = int(179 * 10))
+    # parser.add_argument('--steps', help = 'Number of steps per epoch.', type = int, default = int(179 * 10))
     parser.add_argument('--snapshot-path', help = 'Path to store snapshots of models during training', default = os.path.join("checkpoints", date_and_time))
+    parser.add_argument('--validation-interval', help = 'Validation interval (#epochs).', type = int, default = 10)
     parser.add_argument('--snapshot-interval', help = 'Snapshot interval (#epochs). If provided, not only the best snapshot is saved, but also snapshots with the given interval.', type = int, default = None)
     parser.add_argument('--csv-log-path', help = 'Path to stream results as CSV.', default = None)
     parser.add_argument('--history-dump-path', help = 'Path to dump final history dictionary as JSON.', default = None)
@@ -105,7 +106,9 @@ def parse_args(args):
     parser.add_argument('--image-height', help = 'Image height', required = False, type = int)
 
     print(vars(parser.parse_args(args)))
-    return parser.parse_args(args)
+    args = parser.parse_args(args)
+    assert (args.snapshot_interval % args.validation_interval == 0), 'snapshot_interval {} has to be, but is not, a multiple of validation_interval {}.'.format(snapshot_interval, validation_interval)
+    return args
 
 
 def main(args = None):
@@ -184,6 +187,7 @@ def main(args = None):
     callbacks = create_callbacks(
         model,
         prediction_model,
+        train_generator,
         validation_generator,
         args,
     )
@@ -196,15 +200,17 @@ def main(args = None):
     # start training
     history = model.fit_generator(
         generator = train_generator,
-        steps_per_epoch = args.steps,
         initial_epoch = 0,
+        # steps_per_epoch = args.steps,
+        validation_freq = args.validation_interval,
+        shuffle = True,
         epochs = args.epochs,
         verbose = 1,
         callbacks = callbacks,
         workers = args.workers,
         use_multiprocessing = args.multiprocessing,
         max_queue_size = args.max_queue_size,
-        validation_data = validation_generator
+        validation_data = validation_generator,
     )
     if args.history_dump_path is not None:
         with open(args.history_dump_path, 'w') as f:
@@ -222,7 +228,7 @@ def allow_gpu_growth_memory():
     _ = tf.Session(config = config)
 
 
-def create_callbacks(training_model, prediction_model, validation_generator, args):
+def create_callbacks(training_model, prediction_model, train_generator, validation_generator, args):
     """
     Creates the callbacks to use during training.
 
@@ -289,7 +295,7 @@ def create_callbacks(training_model, prediction_model, validation_generator, arg
 
     if args.evaluation and validation_generator:
         from eval.eval_callback import Evaluate
-        evaluation = Evaluate(validation_generator, prediction_model, tensorboard = tensorboard_callback, save_path = save_path)
+        evaluation = Evaluate(validation_generator, prediction_model, validation_interval = args.validation_interval, tensorboard = tensorboard_callback, save_path = save_path)
         callbacks.append(evaluation)
 
     # save the model
@@ -321,6 +327,18 @@ def create_callbacks(training_model, prediction_model, validation_generator, arg
         cooldown   = 0,
         min_lr     = 1e-7
     ))
+
+    class ReshuffleDataCallback(keras.callbacks.Callback):
+        def __init__(self, generator):
+            self.generator = generator
+            super(ReshuffleDataCallback, self).__init__()
+
+        def on_epoch_begin(self, epoch, logs=None):
+            if self.generator.group_method == 'random':
+                self.generator.group_images()
+            else:
+                assert False, 'Expected random mode for generator, but found {}'.format(self.generator.group_method)
+    callbacks.append(ReshuffleDataCallback(train_generator))
 
     return callbacks
 

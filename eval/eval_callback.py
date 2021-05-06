@@ -50,6 +50,7 @@ class Evaluate(keras.callbacks.Callback):
         self,
         generator,
         model,
+        validation_interval = 1,
         iou_threshold = 0.5,
         score_threshold = 0.05,
         max_detections = 100,
@@ -74,6 +75,7 @@ class Evaluate(keras.callbacks.Callback):
             verbose: Set the verbosity level, by default this is set to 1.
         """
         self.generator       = generator
+        self.validation_interval = validation_interval
         self.iou_threshold   = iou_threshold
         self.score_threshold = score_threshold
         self.max_detections  = max_detections
@@ -87,7 +89,31 @@ class Evaluate(keras.callbacks.Callback):
         super(Evaluate, self).__init__()
 
     def on_epoch_end(self, epoch, logs = None):
-        logs = logs or {}
+        assert logs is not None
+
+        # if not epoch % self.validation_interval == 0:
+        if not (epoch+1) % self.validation_interval == 0:
+            # Skip validation, unless epoch is divisible with validation_interval
+            logs['mAP'] = None
+            logs['ADD'] = None
+            logs['ADD-S'] = None
+            logs['5cm_5degree'] = None
+            logs['TranslationErrorMean_in_mm'] = None
+            logs['TranslationErrorStd_in_mm'] = None
+            logs['RotationErrorMean_in_degree'] = None
+            logs['RotationErrorStd_in_degree'] = None
+            logs['2D-Projection'] = None
+            logs['Summed_Translation_Rotation_Error'] = None
+            logs['ADD(-S)'] = None
+            logs['AveragePointDistanceMean_in_mm'] = None
+            logs['AveragePointDistanceStd_in_mm'] = None
+            logs['AverageSymmetricPointDistanceMean_in_mm'] = None
+            logs['AverageSymmetricPointDistanceStd_in_mm'] = None
+            logs['MixedAveragePointDistanceMean_in_mm'] = None
+            logs['MixedAveragePointDistanceStd_in_mm'] = None
+            return
+
+        # logs = logs or {}
 
         # run evaluation
         average_precisions, add_metric, add_s_metric, metric_5cm_5degree, translation_diff_metric, rotation_diff_metric, metric_2d_projection, mixed_add_and_add_s_metric, average_point_distance_error_metric, average_sym_point_distance_error_metric, mixed_average_point_distance_error_metric = evaluate(

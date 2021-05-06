@@ -824,7 +824,13 @@ class Generator(keras.utils.Sequence):
             order.sort(key=lambda x: self.image_aspect_ratio(x))
 
         # divide into groups, one group = one batch
-        self._groups = [[order[x % len(order)] for x in range(i, i + self.batch_size)] for i in
+
+        # old approach: final batch is augmented with repeated samples from beginning of sequences
+        # self._groups = [[order[x % len(order)] for x in range(i, i + self.batch_size)] for i in
+        #                  range(0, len(order), self.batch_size)]
+
+        # new approach: final batch is not augmented, and may be smaller than the other batches
+        self._groups = [[order[x] for x in range(i, min(i + self.batch_size, len(order)))] for i in
                          range(0, len(order), self.batch_size)]
 
     @property
