@@ -33,14 +33,13 @@ def calculate_image_border_angles(fx, fy, px, py, one_based_indexing_for_prewarp
 def radial_arctan_transform(x, y, fx, fy, px, py, one_based_indexing_for_prewarp, original_image_shape):
     thx_min, thx_max, thy_min, thy_max = calculate_image_border_angles(fx, fy, px, py, one_based_indexing_for_prewarp, original_image_shape)
 
-    # Map from [0, N-1] to [0, 1] range
-    # Note: This behavior should be identical independent of the "one_based_indexing_for_prewarp" flag, since the output coordinates should be zero-based.
-    x /= original_image_shape[1] - 1
-    y /= original_image_shape[0] - 1
+    if one_based_indexing_for_prewarp:
+        x = x + 1
+        y = y + 1
 
-    # Linearly map from [0, 1] interval to angular range
-    x = thx_min + x * (thx_max - thx_min)
-    y = thy_min + y * (thy_max - thy_min)
+    # Apply inv(K)
+    x = (x - px) / fx
+    y = (y - py) / fy
 
     # Rescale vector norm tan(r) -> r unless close to zero. In that case, norm remains untouched, which is sound due to r ~ tan(r) for small r.
     xy_norm = np.sqrt(x**2 + y**2)
@@ -48,12 +47,13 @@ def radial_arctan_transform(x, y, fx, fy, px, py, one_based_indexing_for_prewarp
     x[non_singular_mask] *= np.arctan(xy_norm[non_singular_mask]) / xy_norm[non_singular_mask]
     y[non_singular_mask] *= np.arctan(xy_norm[non_singular_mask]) / xy_norm[non_singular_mask]
 
-    # Apply K
-    x = fx*x + px
-    y = fy*y + py
+    # Linearly map from angular range to [0, 1] interval
+    x = (x - thx_min) / (thx_max - thx_min)
+    y = (y - thy_min) / (thy_max - thy_min)
 
-    if one_based_indexing_for_prewarp:
-        x -= 1
-        y -= 1
+    # Map to [0, N-1] range
+    # Note: This behavior should be identical independent of the "one_based_indexing_for_prewarp" flag, since the output coordinates should be zero-based.
+    x = x * (original_image_shape[1] - 1)
+    y = y * (original_image_shape[0] - 1)
 
     return x, y

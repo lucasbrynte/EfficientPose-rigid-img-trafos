@@ -274,13 +274,14 @@ class CalculateTxTy(keras.layers.Layer):
             thy_max = 1.*thy_max
 
         # inputs shape: (batch, n_anchors, 3)
-        if one_based_indexing_for_prewarp:
-            x = x + 1
-            y = y + 1
+        # Map from [0, N-1] to [0, 1] range
+        # Note: This behavior should be identical independent of the "one_based_indexing_for_prewarp" flag, since the output coordinates should be zero-based.
+        x = x / (original_image_shape[1] - 1)
+        y = y / (original_image_shape[0] - 1)
 
-        # Apply inv(K)
-        x = (x - px) / fx
-        y = (y - py) / fy
+        # Linearly map from [0, 1] interval to angular range
+        x = thx_min + x * (thx_max - thx_min)
+        y = thy_min + y * (thy_max - thy_min)
 
         # Rescale vector norm r -> tan(r) unless close to zero. In that case, norm remains untouched, which is sound due to r ~ tan(r) for small r.
         xy_norm = tf.sqrt(x**2 + y**2)
@@ -288,14 +289,13 @@ class CalculateTxTy(keras.layers.Layer):
         x = tf.where(non_singular_mask, x=x*tf.tan(xy_norm)/xy_norm, y=x)
         y = tf.where(non_singular_mask, x=y*tf.tan(xy_norm)/xy_norm, y=y)
 
-        # Linearly map from angular range to [0, 1] interval
-        x = (x - thx_min) / (thx_max - thx_min)
-        y = (y - thy_min) / (thy_max - thy_min)
+        # Apply K
+        x = fx*x + px
+        y = fy*y + py
 
-        # Map to [0, N-1] range
-        # Note: This behavior should be identical independent of the "one_based_indexing_for_prewarp" flag, since the output coordinates should be zero-based.
-        x = x * (original_image_shape[1] - 1)
-        y = y * (original_image_shape[0] - 1)
+        if one_based_indexing_for_prewarp:
+            x = x - 1
+            y = y - 1
 
         return x, y
 
