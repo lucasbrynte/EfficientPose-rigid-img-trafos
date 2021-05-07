@@ -7,10 +7,10 @@ def calculate_image_border_angles(fx, fy, px, py, one_based_indexing_for_prewarp
     # Define 2D points mid-way along image borders, in homogeneous coordinates.
     # These are the points that are invariant to the arctan warping.
     xx = np.array([
-        [px,  1, 1], # Left
-        [px, mm, 1], # Right
-        [1,  py, 1], # Up
-        [nn, py, 1], # Down
+        [px,  1, 1], # Top
+        [px, mm, 1], # Down
+        [1,  py, 1], # Left
+        [nn, py, 1], # Right
     ]).T
     if not one_based_indexing_for_prewarp:
         xx[:2,:] -= 1

@@ -229,19 +229,19 @@ class CalculateTxTy(keras.layers.Layer):
         # These are the points that are invariant to the arctan warping.
 
         # xx = np.array([
-        #     [px,  1, 1], # Left
-        #     [px, mm, 1], # Right
-        #     [1,  py, 1], # Up
-        #     [nn, py, 1], # Down
+        #     [px,  1, 1], # Top
+        #     [px, mm, 1], # Down
+        #     [1,  py, 1], # Left
+        #     [nn, py, 1], # Right
         # ]).T
 
         # 4 x homogeneous 2D points:
         # xx shape: (bs, 3, 4)
         xx = tf.concat([
-            tf.concat([tf.reshape(px, (bs,1,1)),            tf.ones((bs,1,1)),    tf.ones((bs,1,1))], axis=1), # Left: [px,  1, 1]
-            tf.concat([tf.reshape(px, (bs,1,1)),         mm*tf.ones((bs,1,1)),    tf.ones((bs,1,1))], axis=1), # Right: [px, mm, 1]
-            tf.concat([       tf.ones((bs,1,1)),     tf.reshape(py, (bs,1,1)),    tf.ones((bs,1,1))], axis=1), # Up: [1,  py, 1]
-            tf.concat([    nn*tf.ones((bs,1,1)),     tf.reshape(py, (bs,1,1)),    tf.ones((bs,1,1))], axis=1), # Down: [nn, py, 1]
+            tf.concat([tf.reshape(px, (bs,1,1)),            tf.ones((bs,1,1)),    tf.ones((bs,1,1))], axis=1), # Top: [px,  1, 1]
+            tf.concat([tf.reshape(px, (bs,1,1)),         mm*tf.ones((bs,1,1)),    tf.ones((bs,1,1))], axis=1), # Down: [px, mm, 1]
+            tf.concat([       tf.ones((bs,1,1)),     tf.reshape(py, (bs,1,1)),    tf.ones((bs,1,1))], axis=1), # Left: [1,  py, 1]
+            tf.concat([    nn*tf.ones((bs,1,1)),     tf.reshape(py, (bs,1,1)),    tf.ones((bs,1,1))], axis=1), # Right: [nn, py, 1]
         ], axis=2)
         # if not one_based_indexing_for_prewarp:
         #     xx = tf.concat([xx[:,:2,:]-1, xx[:,[2],:]], axis=1)
