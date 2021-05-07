@@ -107,7 +107,8 @@ def parse_args(args):
 
     print(vars(parser.parse_args(args)))
     args = parser.parse_args(args)
-    assert (args.snapshot_interval % args.validation_interval == 0), 'snapshot_interval {} has to be, but is not, a multiple of validation_interval {}.'.format(snapshot_interval, validation_interval)
+    assert (args.snapshot_interval % args.validation_interval == 0), 'snapshot_interval {} has to be, but is not, a multiple of validation_interval {}.'.format(args.snapshot_interval, args.validation_interval)
+
     return args
 
 
