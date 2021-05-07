@@ -173,8 +173,16 @@ def main(args = None):
         for i in range(1, [227, 329, 329, 374, 464, 566, 656][args.phi]):
             model.layers[i].trainable = False
 
+    def get_lr_metric(optimizer):
+        # def lr(*args, **kwargs):
+        def lr(y_true, y_pred):
+            return optimizer.lr
+        return lr
+
+    optimizer = Adam(lr = args.lr, clipnorm = 0.001)
     # compile model
-    model.compile(optimizer=Adam(lr = args.lr, clipnorm = 0.001), 
+    model.compile(optimizer=optimizer,
+                  metrics = [get_lr_metric(optimizer)],
                   loss={'regression': smooth_l1(),
                         'classification': focal(),
                         'transformation': transformation_loss(model_3d_points_np = train_generator.get_all_3d_model_points_array_for_loss(),
