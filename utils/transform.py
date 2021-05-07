@@ -23,10 +23,10 @@ def calculate_image_border_angles(fx, fy, px, py, one_based_indexing_for_prewarp
     xxsph = xx / np.linalg.norm(xx, axis=0, keepdims=True)
 
     angles = np.arccos(xxsph[2,:])
-    thx_min = -angles[0]
-    thx_max =  angles[1]
-    thy_min = -angles[2]
-    thy_max =  angles[3]
+    thy_min = -angles[0]
+    thy_max =  angles[1]
+    thx_min = -angles[2]
+    thx_max =  angles[3]
 
     assert thx_max > thx_min
     assert thy_max > thy_min

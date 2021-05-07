@@ -259,10 +259,10 @@ class CalculateTxTy(keras.layers.Layer):
         w_component_norm = w / tf.sqrt(x**2 + y**2 + w**2)
 
         angles = tf.math.acos(w_component_norm)
-        thx_min = -angles[:,0]
-        thx_max =  angles[:,1]
-        thy_min = -angles[:,2]
-        thy_max =  angles[:,3]
+        thy_min = -angles[:,0]
+        thy_max =  angles[:,1]
+        thx_min = -angles[:,2]
+        thx_max =  angles[:,3]
 
         return thx_min, thx_max, thy_min, thy_max
 
