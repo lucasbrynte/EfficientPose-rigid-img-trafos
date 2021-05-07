@@ -430,7 +430,10 @@ class OcclusionGenerator(Generator):
             infos: List with all info dictionaries (intrinsic camera parameters) in the dataset split
     
         """
-        all_images_path = os.path.join(object_path, "rgb")
+        if self.radial_arctan_prewarped_images:
+            all_images_path = os.path.join(object_path, "rgb_arctan_warped")
+        else:
+            all_images_path = os.path.join(object_path, "rgb")
         
         #load all images which are in the dataset split (train/test)
         all_filenames = [filename for filename in os.listdir(all_images_path) if self.image_extension in filename and filename.replace(self.image_extension, "") in data_examples]
