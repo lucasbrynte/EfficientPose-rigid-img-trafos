@@ -100,6 +100,8 @@ def parse_args(args):
     parser.add_argument('--workers', help = 'Number of generator workers.', type = int, default = 4)
     parser.add_argument('--max-queue-size', help = 'Queue length for multiprocessing workers in fit_generator.', type = int, default = 10)
 
+    parser.add_argument('--depth-regression-mode', help = 'Controls what to be regressed in order to perform object depth estimation. Choose from: "zcoord" and "cam2obj_dist".', type = str, default = 'zcoord')
+
     parser.add_argument('--radial-arctan-prewarped-images', help = 'Indicates that input images have been subject to a warp operation, where every point has been transformed such that the radial distance r to the principal point is replaced by arctan(r), resulting in an equiangular grid, in the sense of camera rotations.', action = 'store_true')
     parser.add_argument('--one-based-indexing-for-prewarp', help = 'When prewarping the images, one based indexing rather than zero based indexing was assumed.', action = 'store_true')
     parser.add_argument('--image-width', help = 'Image width', required = False, type = int)
@@ -108,6 +110,14 @@ def parse_args(args):
     print(vars(parser.parse_args(args)))
     args = parser.parse_args(args)
     assert (args.snapshot_interval % args.validation_interval == 0), 'snapshot_interval {} has to be, but is not, a multiple of validation_interval {}.'.format(args.snapshot_interval, args.validation_interval)
+
+    # Warped / unwarped images matters as for what depth estimation mode is reasonable.
+    if args.radial_arctan_prewarped_images:
+        # If having arctan-warped the images, the 2D extent of the object surface is roughly proportional to the end-to-end angle between viewing rays, and inversely proportional to the distance between camera and object.
+        assert args.depth_regression_mode == 'cam2obj_dist'
+    else:
+        # For a regular pinhole camera, the 2D extent of the object surface is roughly proportional to the 3D extent of the object in the X/Y directions (scaled with focal length), and inversely proportional to the 3D Z coordinate of the object (in the camera coordinate system).
+        assert args.depth_regression_mode == 'zcoord'
 
     return args
 
@@ -147,6 +157,7 @@ def main(args = None):
                                                               freeze_bn = not args.no_freeze_bn,
                                                               score_threshold = args.score_threshold,
                                                               num_rotation_parameters = num_rotation_parameters,
+                                                              depth_regression_mode = args.depth_regression_mode,
                                                               radial_arctan_prewarped_images = args.radial_arctan_prewarped_images,
                                                               one_based_indexing_for_prewarp = args.one_based_indexing_for_prewarp,
                                                               original_image_shape = (args.image_height, args.image_width),
@@ -374,6 +385,7 @@ def create_generators(args):
             rotation_representation = args.rotation_representation,
             use_colorspace_augmentation = not args.no_color_augmentation,
             use_6DoF_augmentation = not args.no_6dof_augmentation,
+            depth_regression_mode = args.depth_regression_mode,
             radial_arctan_prewarped_images = args.radial_arctan_prewarped_images,
             one_based_indexing_for_prewarp = args.one_based_indexing_for_prewarp,
             original_image_shape = (args.image_height, args.image_width),
@@ -389,6 +401,7 @@ def create_generators(args):
             rotation_representation = args.rotation_representation,
             use_colorspace_augmentation = False,
             use_6DoF_augmentation = False,
+            depth_regression_mode = args.depth_regression_mode,
             radial_arctan_prewarped_images = args.radial_arctan_prewarped_images,
             one_based_indexing_for_prewarp = args.one_based_indexing_for_prewarp,
             original_image_shape = (args.image_height, args.image_width),
@@ -401,6 +414,7 @@ def create_generators(args):
             rotation_representation = args.rotation_representation,
             use_colorspace_augmentation = not args.no_color_augmentation,
             use_6DoF_augmentation = not args.no_6dof_augmentation,
+            depth_regression_mode = args.depth_regression_mode,
             radial_arctan_prewarped_images = args.radial_arctan_prewarped_images,
             one_based_indexing_for_prewarp = args.one_based_indexing_for_prewarp,
             original_image_shape = (args.image_height, args.image_width),
@@ -415,6 +429,7 @@ def create_generators(args):
             rotation_representation = args.rotation_representation,
             use_colorspace_augmentation = False,
             use_6DoF_augmentation = False,
+            depth_regression_mode = args.depth_regression_mode,
             radial_arctan_prewarped_images = args.radial_arctan_prewarped_images,
             one_based_indexing_for_prewarp = args.one_based_indexing_for_prewarp,
             original_image_shape = (args.image_height, args.image_width),

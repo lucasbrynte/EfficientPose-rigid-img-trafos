@@ -64,6 +64,7 @@ def build_EfficientPose(phi,
                         anchor_parameters = None,
                         num_rotation_parameters = 3,
                         print_architecture = True,
+                        depth_regression_mode = 'zcoord',
                         radial_arctan_prewarped_images = False,
                         one_based_indexing_for_prewarp = True,
                         original_image_shape = None,
@@ -129,6 +130,7 @@ def build_EfficientPose(phi,
                                                                                                                    camera_parameters_input,
                                                                                                                    input_size,
                                                                                                                    anchor_parameters,
+                                                                                                                   depth_regression_mode = depth_regression_mode,
                                                                                                                    radial_arctan_prewarped_images = radial_arctan_prewarped_images,
                                                                                                                    one_based_indexing_for_prewarp = one_based_indexing_for_prewarp,
                                                                                                                    original_image_shape = original_image_shape,
@@ -774,7 +776,7 @@ class TranslationNet(models.Model):
         return outputs
     
 
-def apply_subnets_to_feature_maps(box_net, class_net, rotation_net, translation_net, fpn_feature_maps, image_input, camera_parameters_input, input_size, anchor_parameters, radial_arctan_prewarped_images=False, one_based_indexing_for_prewarp=True, original_image_shape=None):
+def apply_subnets_to_feature_maps(box_net, class_net, rotation_net, translation_net, fpn_feature_maps, image_input, camera_parameters_input, input_size, anchor_parameters, depth_regression_mode='zcoord', radial_arctan_prewarped_images=False, one_based_indexing_for_prewarp=True, original_image_shape=None):
     """
     Applies the subnetworks to the BiFPN feature maps
     Args:
@@ -811,6 +813,7 @@ def apply_subnets_to_feature_maps(box_net, class_net, rotation_net, translation_
     
     translation_xy_Tz = RegressTranslation(name = 'translation_regression')([translation_anchors_input, translation_raw])
     translation = CalculateTxTy(name = 'translation')(translation_xy_Tz,
+                                                        depth_regression_mode,
                                                         radial_arctan_prewarped_images,
                                                         one_based_indexing_for_prewarp,
                                                         original_image_shape,

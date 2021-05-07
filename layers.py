@@ -303,7 +303,7 @@ class CalculateTxTy(keras.layers.Layer):
 
         return x, y
 
-    def call(self, inputs, radial_arctan_prewarped_images, one_based_indexing_for_prewarp, original_image_shape, fx = 572.4114, fy = 573.57043, px = 325.2611, py = 242.04899, tz_scale = 1000.0, image_scale = 1.6666666666666667, **kwargs):
+    def call(self, inputs, depth_regression_mode, radial_arctan_prewarped_images, one_based_indexing_for_prewarp, original_image_shape, fx = 572.4114, fy = 573.57043, px = 325.2611, py = 242.04899, tz_scale = 1000.0, image_scale = 1.6666666666666667, **kwargs):
         # Tx = (cx - px) * Tz / fx
         # Ty = (cy - py) * Tz / fy
 
@@ -316,20 +316,38 @@ class CalculateTxTy(keras.layers.Layer):
         
         x = inputs[:, :, 0] / image_scale
         y = inputs[:, :, 1] / image_scale
-        tz = inputs[:, :, 2] * tz_scale
 
         if radial_arctan_prewarped_images:
+            assert depth_regression_mode == 'cam2obj_dist'
+            cam2obj_dist = inputs[:, :, 2] * tz_scale
             x, y = self.radial_tangent_transform(x, y, fx, fy, px, py, one_based_indexing_for_prewarp, original_image_shape)
+            # Now, coordinates are in original (unwarped) image plane. Unnormalized (pixels).
 
-        # Apply inv(K)
-        x = (x - px) / fx
-        y = (y - py) / fy
+            # Apply inv(K)
+            x = (x - px) / fx
+            y = (y - py) / fy
+            # Define z coordinate such that (x,y,z) makes a 3D point on the image plane z=1.
+            z = tf.ones_like(x)
+            # Calculate the norm of that point:
+            tmp_norm = tf.sqrt(x**2 + y**2 + z**2)
 
-        tx = tf.math.multiply(x, tz)
-        ty = tf.math.multiply(y, tz)
-        
+            # Now, rescale all 3 coordinates to perform backprojection, given the cam2obj distance.
+            tx = x / tmp_norm * cam2obj_dist
+            ty = y / tmp_norm * cam2obj_dist
+            tz = z / tmp_norm * cam2obj_dist
+        else:
+            assert depth_regression_mode == 'zcoord'
+            tz = inputs[:, :, 2] * tz_scale
+
+            # Apply inv(K)
+            x = (x - px) / fx
+            y = (y - py) / fy
+
+            tx = tf.math.multiply(x, tz)
+            ty = tf.math.multiply(y, tz)
+
         output = tf.stack([tx, ty, tz], axis = -1)
-        
+
         return output
 
     def compute_output_shape(self, input_shape):

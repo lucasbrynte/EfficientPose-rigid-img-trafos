@@ -55,6 +55,7 @@ class Generator(keras.utils.Sequence):
             rotation_representation = "axis_angle",
             group_method='random',  # one of 'none', 'random', 'ratio'
             shuffle_groups = True,
+            depth_regression_mode = 'zcoord',
             radial_arctan_prewarped_images = False,
             one_based_indexing_for_prewarp = True,
             original_image_shape = None,
@@ -98,6 +99,7 @@ class Generator(keras.utils.Sequence):
         else:
             self.rand_aug = None
 
+        self.depth_regression_mode = depth_regression_mode
         self.radial_arctan_prewarped_images = radial_arctan_prewarped_images
         self.one_based_indexing_for_prewarp = one_based_indexing_for_prewarp
         self.original_image_shape = original_image_shape
@@ -430,9 +432,26 @@ class Generator(keras.utils.Sequence):
             still_valid_annos: numpy boolean array of shape (num_annotations,) indicating if the augmented annotation of each object is still valid or not (object rotated out of the image for example)
             is_valid_augmentation: Boolean indicating wheter there is at least one valid annotated object after the augmentation
         """
+        if self.radial_arctan_prewarped_images:
+            assert self.depth_regression_mode == 'cam2obj_dist'
+        else:
+            assert self.depth_regression_mode == 'zcoord'
         #get the center point from the intrinsic camera matrix
         cx = camera_matrix[0, 2]
         cy = camera_matrix[1, 2]
+        if self.depth_regression_mode == 'cam2obj_dist':
+            # Transform principal point, according to warping.
+            cx, cy = radial_arctan_transform(
+                cx.reshape((1,1)), # x
+                cy.reshape((1,1)), # y
+                camera_matrix[0,0], # fx
+                camera_matrix[1,1], # fy
+                camera_matrix[0,2], # px
+                camera_matrix[1,2], # py
+                self.one_based_indexing_for_prewarp,
+                self.original_image_shape,
+            )
+
         height, width, _ = img.shape
         #rotate and scale image
         rot_2d_mat = cv2.getRotationMatrix2D((cx, cy), -angle, scale)
@@ -465,12 +484,39 @@ class Generator(keras.utils.Sequence):
             tmp_rotation_matrix, _ = cv2.Rodrigues(tmp_rotation_vector)
             #get the final augmentation rotation
             augmented_rotation_matrix = np.dot(tmp_rotation_matrix, rotation_matrix_annos[i, :, :])
-            augmented_rotation_vector, _ = cv2.Rodrigues(augmented_rotation_matrix)
-            
+
             #also rotate the gt translation vector first and then adjust Tz with the given augmentation scale
             augmented_translation_vector = np.dot(np.copy(translation_vector_annos[i, :]), tmp_rotation_matrix.T)
-            augmented_translation_vector[2] /= scale
-            
+
+            if self.depth_regression_mode == 'cam2obj_dist':
+                # Start with rescaling the whole translation vector.
+                # This corresponds to translation along the viewing ray, rather than just along z direction like in the other case.
+                augmented_translation_vector /= scale
+
+                # Next, the x/y rescale in the image plane is accounted for via a rescale of the angle between the principal axis [0, 0, 1] and the viewing ray.
+                # The end goal is to determine a rotation matrix R_vr1_to_vr2, which carries out a final rotation, corresponding to the movement of the viewing ray towards the object center during the image rescale.
+                # Viewing ray vr1 -> viewing ray vr2
+                # old angle theta 1 -> new angle theta2
+                sin_theta1_axis_pa_to_vr1 = np.cross(np.array([0, 0, 1]), augmented_translation_vector) / np.linalg.norm(augmented_translation_vector)
+                theta1 = np.arcsin(np.linalg.norm(sin_theta1_axis_pa_to_vr1))
+                if theta1 < 1e-4:
+                    # Avoid numerical errors. sin(theta1) ~ theta1 < 1e-4
+                    R_vr1_to_vr2 = np.eye(3)
+                else:
+                    unit_axis_pa_to_vr1 = sin_theta1_axis_pa_to_vr1 / np.linalg.norm(sin_theta1_axis_pa_to_vr1)
+                    theta2 = theta1 * scale
+                    R_vr1_to_vr2, _ = cv2.Rodrigues((theta2 - theta1) * unit_axis_pa_to_vr1)
+
+                # Update the augmented R, t annotations according to the final rotation.
+                # Exploit that: R*v = v^T*R^T. 1D array is treated as row vector.
+                augmented_translation_vector = np.dot(augmented_translation_vector, R_vr1_to_vr2.T)
+                augmented_rotation_matrix = np.dot(R_vr1_to_vr2, augmented_rotation_matrix)
+            else:
+                assert self.depth_regression_mode == 'zcoord'
+                augmented_translation_vector[2] /= scale
+
+            augmented_rotation_vector, _ = cv2.Rodrigues(augmented_rotation_matrix)
+
             #fill in augmented annotations
             augmented_rotation_vector_annos[i, :] = np.squeeze(augmented_rotation_vector)
             augmented_translation_vector_annos[i, :] = augmented_translation_vector
