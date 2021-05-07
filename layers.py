@@ -268,6 +268,10 @@ class CalculateTxTy(keras.layers.Layer):
 
     def radial_tangent_transform(self, x, y, fx, fy, px, py, one_based_indexing_for_prewarp, original_image_shape):
         thx_min, thx_max, thy_min, thy_max = self.calculate_image_border_angles(fx, fy, px, py, one_based_indexing_for_prewarp, original_image_shape)
+        thx_min = tf.expand_dims(thx_min, axis = -1)
+        thx_max = tf.expand_dims(thx_max, axis = -1)
+        thy_min = tf.expand_dims(thy_min, axis = -1)
+        thy_max = tf.expand_dims(thy_max, axis = -1)
         with tf.control_dependencies([tf.assert_greater(thx_max, thx_min)]):
             thx_max = 1.*thx_max
         with tf.control_dependencies([tf.assert_greater(thy_max, thy_min)]):
