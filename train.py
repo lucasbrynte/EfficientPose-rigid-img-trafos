@@ -329,7 +329,7 @@ def create_callbacks(training_model, prediction_model, train_generator, validati
     callbacks.append(keras.callbacks.ReduceLROnPlateau(
         monitor    = 'MixedAveragePointDistanceMean_in_mm',
         factor     = 0.5,
-        patience   = 25,
+        patience   = 250 // args.validation_interval, # When validation is not run, and monitored value is None, the corresponding epoch is ignored. Effectively, patience*validation_interval is the number of epochs of patience.
         verbose    = 1,
         mode       = 'min',
         min_delta  = 0.0001,
