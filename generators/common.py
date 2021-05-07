@@ -745,10 +745,10 @@ class Generator(keras.utils.Sequence):
 
         if self.radial_arctan_prewarped_images:
             assert len(points_2D.shape) in [1, 2] and points_2D.shape[-1] == 2
-            points_2D = points_2D.reshape((2, -1))
+            points_2D = points_2D.reshape((-1, 2)).T
+            N = points_2D.shape[1]
             assert np.isclose(camera_matrix[2,2], 1)
-            points_2D = radial_arctan_transform(
-                # points_2D,
+            x, y = radial_arctan_transform(
                 points_2D[0,:], # x
                 points_2D[1,:], # y
                 camera_matrix[0,0], # fx
@@ -758,6 +758,11 @@ class Generator(keras.utils.Sequence):
                 self.one_based_indexing_for_prewarp,
                 self.original_image_shape,
             )
+            points_2D = np.vstack([x, y])
+            assert points_2D.shape == (2, N)
+            points_2D = points_2D.T
+
+        points_2D = np.squeeze(points_2D)
 
         return points_2D
     

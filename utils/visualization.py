@@ -144,11 +144,11 @@ def project_bbox_3D_to_2D(
     points_bbox_2D = np.squeeze(points_bbox_2D)
 
     if radial_arctan_prewarped_images:
-        assert len(points_bbox_2D.shape) == 2
-        assert points_bbox_2D.shape[0] == 2
+        assert len(points_bbox_2D.shape) in [1, 2] and points_bbox_2D.shape[-1] == 2
+        points_bbox_2D = points_bbox_2D.reshape((-1, 2)).T
+        N = points_bbox_2D.shape[1]
         assert np.isclose(camera_matrix[2,2], 1)
-        points_bbox_2D = radial_arctan_transform(
-            # points_bbox_2D,
+        x, y = radial_arctan_transform(
             points_bbox_2D[0,:], # x
             points_bbox_2D[1,:], # y
             camera_matrix[0,0], # fx
@@ -158,6 +158,11 @@ def project_bbox_3D_to_2D(
             one_based_indexing_for_prewarp,
             original_image_shape,
         )
+        points_bbox_2D = np.vstack([x, y])
+        assert points_bbox_2D.shape == (2, N)
+        points_bbox_2D = points_bbox_2D.T
+
+    points_bbox_2D = np.squeeze(points_bbox_2D)
 
     return points_bbox_2D
     
