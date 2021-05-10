@@ -79,6 +79,7 @@ def parse_args(args):
     parser.add_argument('--lr', help = 'Learning rate', default = 1e-4, type = float)
     parser.add_argument('--no-color-augmentation', help = 'Do not use colorspace augmentation', action = 'store_true')
     parser.add_argument('--no-6dof-augmentation', help = 'Do not use 6DoF augmentation', action = 'store_true')
+    parser.add_argument('--scale-6dof-augmentation', help = 'Range from which to uniformly sample scales for 6DoF augmentation. Default: "--scale-6dof-augmentation 0.7 1.3"', default = (0.7, 1.3), type = float, nargs=2)
     parser.add_argument('--phi', help = 'Hyper parameter phi', default = 0, type = int, choices = (0, 1, 2, 3, 4, 5, 6))
     parser.add_argument('--gpu', help = 'Id of the GPU to use (as reported by nvidia-smi).')
     parser.add_argument('--epochs', help = 'Number of epochs to train.', type = int, default = 500)
@@ -386,6 +387,7 @@ def create_generators(args):
             rotation_representation = args.rotation_representation,
             use_colorspace_augmentation = not args.no_color_augmentation,
             use_6DoF_augmentation = not args.no_6dof_augmentation,
+            scale_6DoF_augmentation = args.scale_6dof_augmentation,
             depth_regression_mode = args.depth_regression_mode,
             radial_arctan_prewarped_images = args.radial_arctan_prewarped_images,
             one_based_indexing_for_prewarp = args.one_based_indexing_for_prewarp,
@@ -415,6 +417,7 @@ def create_generators(args):
             rotation_representation = args.rotation_representation,
             use_colorspace_augmentation = not args.no_color_augmentation,
             use_6DoF_augmentation = not args.no_6dof_augmentation,
+            scale_6DoF_augmentation = args.scale_6dof_augmentation,
             depth_regression_mode = args.depth_regression_mode,
             radial_arctan_prewarped_images = args.radial_arctan_prewarped_images,
             one_based_indexing_for_prewarp = args.one_based_indexing_for_prewarp,
