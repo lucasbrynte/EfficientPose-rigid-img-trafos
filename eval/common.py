@@ -121,7 +121,7 @@ def _get_detections(generator, model, score_threshold = 0.05, max_detections = 1
         boxes /= scale
         
         #rescale rotations and translations
-        rotations *= math.pi
+        rotations[:, :, :3] *= math.pi
         height, width, _ = raw_image.shape
 
         # select indices which have a score above the threshold
