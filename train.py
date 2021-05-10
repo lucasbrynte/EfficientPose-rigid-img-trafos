@@ -325,7 +325,7 @@ def create_callbacks(training_model, prediction_model, train_generator, validati
         # ensure directory created first; otherwise h5py will error after epoch.
         os.makedirs(snapshot_path, exist_ok = True)
         save_best_only = args.snapshot_interval is None
-        checkpoint = keras.callbacks.ModelCheckpoint(os.path.join(snapshot_path, 'epoch_{{epoch:02d}}_phi_{phi}_{dataset_type}_{metric}_{{{metric}:.02f}}{best_suffix}.h5'.format(phi = str(args.phi), metric = metric_to_monitor, best_suffix = '_best_{metric}' if save_best_only else ''.format(metric = metric_to_monitor), dataset_type = args.dataset_type)),
+        checkpoint = keras.callbacks.ModelCheckpoint(os.path.join(snapshot_path, 'epoch_{{epoch:02d}}_phi_{phi}_{dataset_type}_{metric}_{{{metric}:.04f}}{best_suffix}.h5'.format(phi = str(args.phi), metric = metric_to_monitor, best_suffix = '_best_{metric}' if save_best_only else ''.format(metric = metric_to_monitor), dataset_type = args.dataset_type)),
                                                      verbose = 1,
                                                      #save_weights_only = True,
                                                      # save_best_only = True,
