@@ -73,6 +73,7 @@ def parse_args(args):
     parser.add_argument('--validation-image-save-path', help = 'path where to save the predicted validation images after each epoch', default = None)
 
     parser.add_argument('--depth-regression-mode', help = 'Controls what to be regressed in order to perform object depth estimation. Choose from: "zcoord" and "cam2obj_dist".', type = str, default = 'zcoord')
+    parser.add_argument('--rot-target-frame-of-ref', help = 'Controls what frame of reference to use for the target orientation to be estimated. Choose from: "cam" and "cam_aligned_towards_obj".', type = str, default = 'cam')
 
     parser.add_argument('--radial-arctan-prewarped-images', help = 'Indicates that input images have been subject to a warp operation, where every point has been transformed such that the radial distance r to the principal point is replaced by arctan(r), resulting in an equiangular grid, in the sense of camera rotations.', action = 'store_true')
     parser.add_argument('--one-based-indexing-for-prewarp', help = 'When prewarping the images, one based indexing rather than zero based indexing was assumed.', action = 'store_true')
@@ -133,7 +134,7 @@ def main(args=None):
     prediction_model.load_weights(args.weights, by_name = True)
     print("\nDone!")
     
-    evaluate_model(prediction_model, generator, args.validation_image_save_path, args.score_threshold)
+    evaluate_model(prediction_model, generator, args.validation_image_save_path, args.score_threshold, rot_target_frame_of_ref=args.rot_target_frame_of_ref)
     
     
 def allow_gpu_growth_memory():
@@ -202,7 +203,7 @@ def create_generators(args):
     return generator  
 
 
-def evaluate_model(model, generator, save_path, score_threshold, iou_threshold = 0.5, max_detections = 100, diameter_threshold = 0.1):
+def evaluate_model(model, generator, save_path, score_threshold, iou_threshold = 0.5, max_detections = 100, diameter_threshold = 0.1, rot_target_frame_of_ref = 'cam'):
     """
     Evaluates a given model using the data from the given generator.
 
@@ -225,7 +226,8 @@ def evaluate_model(model, generator, save_path, score_threshold, iou_threshold =
         score_threshold = score_threshold,
         max_detections = max_detections,
         save_path = save_path,
-        diameter_threshold = diameter_threshold
+        diameter_threshold = diameter_threshold,
+        rot_target_frame_of_ref = rot_target_frame_of_ref,
     )
 
     verbose = 1

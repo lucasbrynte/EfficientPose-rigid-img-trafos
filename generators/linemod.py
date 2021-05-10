@@ -32,6 +32,7 @@ import copy
 from plyfile import PlyData
 
 from generators.common import Generator
+from utils.geometry import align_R_target_rel_to_obj_vr
 
 
 #Generator for the LINEMOD Dataset downloaded from here: https://github.com/j96w/DenseFusion
@@ -436,12 +437,19 @@ class LineModGenerator(Generator):
             #get bbox from mask
             mask = cv2.imread(mask_path)
             annotations["bboxes"][0, :], _ = self.get_bbox_from_mask(mask)
+            R_target = np.array(gt["cam_R_m2c"])
+            t_target = np.array(gt["cam_t_m2c"])
+            if self.rot_target_frame_of_ref == 'cam_aligned_towards_obj':
+                # Modify annotation such that rotation is not relative to camera coordinate frame, but relative to the coordinate frame retrieved by aligning the camera coordinate frame such that the principal axis points towards the object.
+                R_target = align_R_target_rel_to_obj_vr(R_target, t_target)
+            else:
+                assert self.rot_target_frame_of_ref == 'cam'
             #transform rotation into the needed representation
-            annotations["rotations"][0, :-2] = self.transform_rotation(np.array(gt["cam_R_m2c"]), self.rotation_representation)
+            annotations["rotations"][0, :-2] = self.transform_rotation(R_target, self.rotation_representation)
             annotations["rotations"][0, -2] = float(self.is_symmetric_object(self.object_id))
             annotations["rotations"][0, -1] = float(0) #useless for linemod because there is only one object but neccessary to keep compatibility of the architecture with multi-object datasets
             
-            annotations["translations"][0, :] = np.array(gt["cam_t_m2c"])
+            annotations["translations"][0, :] = t_target
             annotations["translations_x_y_2D"][0, :] = self.project_points_3D_to_2D(points_3D = np.zeros(shape = (1, 3)), #transform the object origin point which is the centerpoint
                                                                                     rotation_vector = self.transform_rotation(np.array(gt["cam_R_m2c"]), "axis_angle"),
                                                                                     translation_vector = np.array(gt["cam_t_m2c"]),

@@ -32,6 +32,7 @@ from tensorflow import keras
 
 from utils.anchors import anchors_for_shape, anchor_targets_bbox, AnchorParameters
 from utils.transform import radial_arctan_transform
+from utils.geometry import align_R_target_rel_to_obj_vr, realign_R_target_rel_to_pa
 from generators.randaug import RandAugment
 
 
@@ -56,6 +57,7 @@ class Generator(keras.utils.Sequence):
             group_method='random',  # one of 'none', 'random', 'ratio'
             shuffle_groups = True,
             depth_regression_mode = 'zcoord',
+            rot_target_frame_of_ref = 'cam',
             radial_arctan_prewarped_images = False,
             one_based_indexing_for_prewarp = True,
             original_image_shape = None,
@@ -100,6 +102,7 @@ class Generator(keras.utils.Sequence):
             self.rand_aug = None
 
         self.depth_regression_mode = depth_regression_mode
+        self.rot_target_frame_of_ref = rot_target_frame_of_ref
         self.radial_arctan_prewarped_images = radial_arctan_prewarped_images
         self.one_based_indexing_for_prewarp = one_based_indexing_for_prewarp
         self.original_image_shape = original_image_shape
@@ -371,6 +374,12 @@ class Generator(keras.utils.Sequence):
         for i in range(num_annos):
             rotation_matrix_annos[i, :, :] = self.axis_angle_to_rotation_mat(annotations["rotations"][i, :3])
             translation_vector_annos[i, :] = annotations["translations"][i, :]
+            if self.rot_target_frame_of_ref == 'cam_aligned_towards_obj':
+                # In this case, the annotated rotation is in reference to the camera after alignment with the object viewing ray.
+                # The easiest way to account for this, is to reverse the change of reference, carry out the augmentation in the original camera frame, and again apply the change of reference.
+                rotation_matrix_annos[i, :, :] = realign_R_target_rel_to_pa(rotation_matrix_annos[i, :, :], translation_vector_annos[i, :])
+            else:
+                assert self.rot_target_frame_of_ref == 'cam'
             mask_values[i] = self.name_to_mask_value[self.class_to_name[annotations["labels"][i]]]
         
         #generate random scale and angle
@@ -391,6 +400,15 @@ class Generator(keras.utils.Sequence):
                 annotations["bboxes"][i, :] = augmented_bbox[i, :]
                 annotations["rotations"][i, :3] = augmented_rotation_vector[i, :]
                 annotations["translations"][i, :] = augmented_translation_vector[i, :]
+                if self.rot_target_frame_of_ref == 'cam_aligned_towards_obj':
+                    # In this case, the annotated rotation is in reference to the camera after alignment with the object viewing ray.
+                    # The easiest way to account for this, is to reverse the change of reference, carry out the augmentation in the original camera frame, and again apply the change of reference.
+                    R = self.axis_angle_to_rotation_mat(annotations["rotations"][i, :3])
+                    R = align_R_target_rel_to_obj_vr(R, annotations["translations"][i, :])
+                    rotation_vector, _ = cv2.Rodrigues(R)
+                    annotations["rotations"][i, :3] = np.squeeze(rotation_vector)
+                else:
+                    assert self.rot_target_frame_of_ref == 'cam'
                 annotations["translations_x_y_2D"][i, :] = self.project_points_3D_to_2D(points_3D = np.zeros(shape = (1, 3)), #transform the object coordinate system origin point which is the centerpoint
                                                                                         rotation_vector = augmented_rotation_vector[i, :],
                                                                                         translation_vector = augmented_translation_vector[i, :],
@@ -436,6 +454,7 @@ class Generator(keras.utils.Sequence):
             assert self.depth_regression_mode == 'cam2obj_dist'
         else:
             assert self.depth_regression_mode == 'zcoord'
+
         #get the center point from the intrinsic camera matrix
         cx = camera_matrix[0, 2]
         cy = camera_matrix[1, 2]

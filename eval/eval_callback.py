@@ -55,6 +55,7 @@ class Evaluate(keras.callbacks.Callback):
         score_threshold = 0.05,
         max_detections = 100,
         diameter_threshold = 0.1,
+        rot_target_frame_of_ref = 'cam',
         save_path = None,
         tensorboard = None,
         weighted_average = False,
@@ -84,6 +85,7 @@ class Evaluate(keras.callbacks.Callback):
         self.weighted_average = weighted_average
         self.verbose         = verbose
         self.diameter_threshold = diameter_threshold
+        self.rot_target_frame_of_ref = rot_target_frame_of_ref
         self.active_model = model
 
         super(Evaluate, self).__init__()
@@ -123,7 +125,8 @@ class Evaluate(keras.callbacks.Callback):
             score_threshold=self.score_threshold,
             max_detections=self.max_detections,
             save_path=self.save_path,
-            diameter_threshold = self.diameter_threshold
+            diameter_threshold = self.diameter_threshold,
+            rot_target_frame_of_ref = self.rot_target_frame_of_ref,
         )
 
         # compute per class average precision

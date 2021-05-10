@@ -101,6 +101,7 @@ def parse_args(args):
     parser.add_argument('--max-queue-size', help = 'Queue length for multiprocessing workers in fit_generator.', type = int, default = 10)
 
     parser.add_argument('--depth-regression-mode', help = 'Controls what to be regressed in order to perform object depth estimation. Choose from: "zcoord" and "cam2obj_dist".', type = str, default = 'zcoord')
+    parser.add_argument('--rot-target-frame-of-ref', help = 'Controls what frame of reference to use for the target orientation to be estimated. Choose from: "cam" and "cam_aligned_towards_obj".', type = str, default = 'cam')
 
     parser.add_argument('--radial-arctan-prewarped-images', help = 'Indicates that input images have been subject to a warp operation, where every point has been transformed such that the radial distance r to the principal point is replaced by arctan(r), resulting in an equiangular grid, in the sense of camera rotations.', action = 'store_true')
     parser.add_argument('--one-based-indexing-for-prewarp', help = 'When prewarping the images, one based indexing rather than zero based indexing was assumed.', action = 'store_true')
@@ -315,7 +316,7 @@ def create_callbacks(training_model, prediction_model, train_generator, validati
 
     if args.evaluation and validation_generator:
         from eval.eval_callback import Evaluate
-        evaluation = Evaluate(validation_generator, prediction_model, validation_interval = args.validation_interval, tensorboard = tensorboard_callback, save_path = save_path)
+        evaluation = Evaluate(validation_generator, prediction_model, validation_interval = args.validation_interval, tensorboard = tensorboard_callback, save_path = save_path, rot_target_frame_of_ref = args.rot_target_frame_of_ref)
         callbacks.append(evaluation)
 
     # save the model

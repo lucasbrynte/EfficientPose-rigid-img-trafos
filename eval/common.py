@@ -39,6 +39,7 @@ limitations under the License.
 
 from utils.compute_overlap import compute_overlap, wrapper_c_min_distances
 from utils.visualization import draw_detections, draw_annotations
+from utils.geometry import realign_R_target_rel_to_pa
 
 import tensorflow as tf
 import numpy as np
@@ -80,7 +81,7 @@ def _compute_ap(recall, precision):
     return ap
 
 
-def _get_detections(generator, model, score_threshold = 0.05, max_detections = 100, save_path = None):
+def _get_detections(generator, model, score_threshold = 0.05, max_detections = 100, save_path = None, rot_target_frame_of_ref='cam'):
     """ Get the detections from the model using the generator.
 
     The result is a list of lists such that the size is:
@@ -123,6 +124,17 @@ def _get_detections(generator, model, score_threshold = 0.05, max_detections = 1
         #rescale rotations and translations
         rotations[:, :, :3] *= math.pi
         height, width, _ = raw_image.shape
+
+        if rot_target_frame_of_ref:
+            for sample_idx in range(rotations.shape[0]):
+                for det_idx in range(rotations.shape[1]):
+                    r_vec = rotations[sample_idx, det_idx, :3]
+                    t = translations[sample_idx, det_idx, :]
+                    R, _ = cv2.Rodrigues(r_vec[:, None])
+                    R = realign_R_target_rel_to_pa(R, t)
+                    r_vec, _ = cv2.Rodrigues(R)
+                    r_vec = np.squeeze(r_vec)
+                    rotations[sample_idx, det_idx, :3] = r_vec
 
         # select indices which have a score above the threshold
         indices = np.where(scores[0, :] > score_threshold)[0]
@@ -180,7 +192,7 @@ def _get_detections(generator, model, score_threshold = 0.05, max_detections = 1
     return all_detections
 
 
-def _get_annotations(generator):
+def _get_annotations(generator, rot_target_frame_of_ref='cam'):
     """ Get the ground truth annotations from the generator.
 
     The result is a list of lists such that the size is:
@@ -202,7 +214,21 @@ def _get_annotations(generator):
             if not generator.has_label(label):
                 continue
 
-            all_annotations[i][label] = (annotations['bboxes'][annotations['labels'] == label, :].copy(), annotations['rotations'][annotations['labels'] == label, :].copy(), annotations['translations'][annotations['labels'] == label, :].copy())
+            bboxes = annotations['bboxes'][annotations['labels'] == label, :].copy()
+            rotations = annotations['rotations'][annotations['labels'] == label, :].copy()
+            translations = annotations['translations'][annotations['labels'] == label, :].copy()
+
+            if rot_target_frame_of_ref:
+                for det_idx in range(rotations.shape[0]):
+                    r_vec = rotations[det_idx, :3]
+                    t = translations[det_idx, :]
+                    R, _ = cv2.Rodrigues(r_vec[:, None])
+                    R = realign_R_target_rel_to_pa(R, t)
+                    r_vec, _ = cv2.Rodrigues(R)
+                    r_vec = np.squeeze(r_vec)
+                    rotations[det_idx, :3] = r_vec
+
+            all_annotations[i][label] = (bboxes, rotations, translations)
 
     return all_annotations
 
@@ -391,6 +417,7 @@ def evaluate(
     max_detections = 100,
     save_path = None,
     diameter_threshold = 0.1,
+    rot_target_frame_of_ref = 'cam',
 ):
     """ Evaluate a given dataset using a given model.
 
@@ -406,8 +433,8 @@ def evaluate(
         Several dictionaries mapping class names to the computed metrics.
     """
     # gather all detections and annotations
-    all_detections     = _get_detections(generator, model, score_threshold=score_threshold, max_detections=max_detections, save_path=save_path)
-    all_annotations    = _get_annotations(generator)
+    all_detections     = _get_detections(generator, model, score_threshold=score_threshold, max_detections=max_detections, save_path=save_path, rot_target_frame_of_ref=rot_target_frame_of_ref)
+    all_annotations    = _get_annotations(generator, rot_target_frame_of_ref=rot_target_frame_of_ref)
     all_3d_models      = generator.get_models_3d_points_dict()
     all_3d_model_diameters = generator.get_objects_diameter_dict()
     average_precisions = {}
