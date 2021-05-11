@@ -49,6 +49,7 @@ class Generator(keras.utils.Sequence):
             use_colorspace_augmentation = False,
             use_6DoF_augmentation = False,
             scale_6DoF_augmentation = (0.7, 1.3),
+            inplane_angle_6DoF_augmentation = (0, 360),
             chance_no_augmentation = 0.02,
             translation_scale_norm = 1000.0,
             points_for_shape_match_loss = 500,
@@ -96,6 +97,7 @@ class Generator(keras.utils.Sequence):
         self.translation_scale_norm = translation_scale_norm
         self.points_for_shape_match_loss = points_for_shape_match_loss
         self.scale_6DoF_augmentation = scale_6DoF_augmentation
+        self.inplane_angle_6DoF_augmentation = inplane_angle_6DoF_augmentation
         if self.use_colorspace_augmentation:
             self.rand_aug = RandAugment(n = (1, 3), m = (1, 14))
         else:
@@ -385,13 +387,14 @@ class Generator(keras.utils.Sequence):
         #generate random scale and angle
         scale_range, min_scale = self.get_scale_6DoF_augmentation_parameter()
         scale = random.random() * scale_range + min_scale #standard is scale between [0.7, 1.3]
-        angle = random.random() * 360
+        inplane_angle_range, min_inplane_angle = self.get_inplane_angle_6DoF_augmentation_parameter()
+        inplane_angle = random.random() * inplane_angle_range + min_inplane_angle #standard is angle between [0, 360]
         
         augmented_img, augmented_rotation_vector, augmented_translation_vector, augmented_bbox, still_valid_annos, is_valid_augmentation = self.augmentation_6DoF(img = img,
                                                                                                                                                 mask = mask,
                                                                                                                                                 rotation_matrix_annos = rotation_matrix_annos,
                                                                                                                                                 translation_vector_annos = translation_vector_annos,
-                                                                                                                                                angle = angle,
+                                                                                                                                                inplane_angle = inplane_angle,
                                                                                                                                                 scale = scale,
                                                                                                                                                 camera_matrix = camera_matrix,
                                                                                                                                                 mask_values = mask_values)
@@ -431,14 +434,14 @@ class Generator(keras.utils.Sequence):
         return augmented_img, annotations
     
     
-    def augmentation_6DoF(self, img, mask, rotation_matrix_annos, translation_vector_annos, angle, scale, camera_matrix, mask_values):
+    def augmentation_6DoF(self, img, mask, rotation_matrix_annos, translation_vector_annos, inplane_angle, scale, camera_matrix, mask_values):
         """ Computes the 6D augmentation.
         Args:
             img: The image to augment
             mask: The segmentation mask of the image
             rotation_matrix_annos: numpy array with shape (num_annotations, 3, 3) which contains the ground truth rotation matrix for each annotated object in the image
             translation_vector_annos: numpy array with shape (num_annotations, 3) which contains the ground truth translation vectors for each annotated object in the image
-            angle: rotate the image with the given angle
+            inplane_angle: rotate the image with the given angle
             scale: scale the image with the given scale
             camera_matrix: The camera matrix of the example
             mask_values: numpy array of shape (num_annotations,) containing the segmentation mask value of each annotated object
@@ -473,7 +476,7 @@ class Generator(keras.utils.Sequence):
 
         height, width, _ = img.shape
         #rotate and scale image
-        rot_2d_mat = cv2.getRotationMatrix2D((cx, cy), -angle, scale)
+        rot_2d_mat = cv2.getRotationMatrix2D((cx, cy), -inplane_angle, scale)
         augmented_img = cv2.warpAffine(img, rot_2d_mat, (width, height))
         #append the affine transformation also to the mask to extract the augmented bbox afterwards
         augmented_mask = cv2.warpAffine(mask, rot_2d_mat, (width, height), flags = cv2.INTER_NEAREST) #use nearest neighbor interpolation to keep valid mask values
@@ -497,9 +500,9 @@ class Generator(keras.utils.Sequence):
                 still_valid_annos[i] = False
                 continue
         
-            #create additional rotation vector representing the rotation of the given angle around the z-axis in the camera coordinate system
+            #create additional rotation vector representing the rotation of the given inplane_angle around the z-axis in the camera coordinate system
             tmp_rotation_vector = np.zeros((3,))
-            tmp_rotation_vector[2] = angle / 180. * math.pi
+            tmp_rotation_vector[2] = inplane_angle / 180. * math.pi
             tmp_rotation_matrix, _ = cv2.Rodrigues(tmp_rotation_vector)
             #get the final augmentation rotation
             augmented_rotation_matrix = np.dot(tmp_rotation_matrix, rotation_matrix_annos[i, :, :])
@@ -562,6 +565,18 @@ class Generator(keras.utils.Sequence):
         return scale_range, min_scale
     
     
+    def get_inplane_angle_6DoF_augmentation_parameter(self):
+        """ Returns the 6D augmentation config parameter.
+        Returns:
+            inplane_angle_range: Float representing the range of the 6D augmentation angle
+            min_inplane_angle: Float representing the minimum angle of the 6D augmentation
+        """
+        min_inplane_angle, max_inplane_angle = self.inplane_angle_6DoF_augmentation
+        assert not max_inplane_angle < min_inplane_angle
+        inplane_angle_range = max_inplane_angle - min_inplane_angle
+        return inplane_angle_range, min_inplane_angle
+
+
     def get_bbox_from_mask(self, mask, mask_value = None):
         """ Computes the 2D bounding box from the input mask
         Args:
