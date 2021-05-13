@@ -480,6 +480,8 @@ class Generator(keras.utils.Sequence):
 
         height, width, _ = img.shape
         #rotate and scale image
+
+        ########### IN-PLANE ROTATION ###########
         try:
             rot_2d_mat = cv2.getRotationMatrix2D((cx, cy), -inplane_angle, scale)
         except:
@@ -487,6 +489,12 @@ class Generator(keras.utils.Sequence):
         augmented_img = cv2.warpAffine(img, rot_2d_mat, (width, height))
         #append the affine transformation also to the mask to extract the augmented bbox afterwards
         augmented_mask = cv2.warpAffine(mask, rot_2d_mat, (width, height), flags = cv2.INTER_NEAREST) #use nearest neighbor interpolation to keep valid mask values
+
+        # Express in-plane rotation with 3D rotation vector / matrix. Rotation is around the z-axis in the camera coordinate system.
+        inplane_rotation_vector = np.zeros((3,))
+        inplane_rotation_vector[2] = inplane_angle / 180. * math.pi
+        R_inplane, _ = cv2.Rodrigues(inplane_rotation_vector)
+
         #check if complete mask is zero
         _, is_valid_augmentation = self.get_bbox_from_mask(augmented_mask)
         if not is_valid_augmentation:
@@ -507,15 +515,11 @@ class Generator(keras.utils.Sequence):
                 still_valid_annos[i] = False
                 continue
         
-            #create additional rotation vector representing the rotation of the given inplane_angle around the z-axis in the camera coordinate system
-            tmp_rotation_vector = np.zeros((3,))
-            tmp_rotation_vector[2] = inplane_angle / 180. * math.pi
-            tmp_rotation_matrix, _ = cv2.Rodrigues(tmp_rotation_vector)
             #get the final augmentation rotation
-            augmented_rotation_matrix = np.dot(tmp_rotation_matrix, rotation_matrix_annos[i, :, :])
+            augmented_rotation_matrix = np.dot(R_inplane, rotation_matrix_annos[i, :, :])
 
             #also rotate the gt translation vector first and then adjust Tz with the given augmentation scale
-            augmented_translation_vector = np.dot(np.copy(translation_vector_annos[i, :]), tmp_rotation_matrix.T)
+            augmented_translation_vector = np.dot(np.copy(translation_vector_annos[i, :]), R_inplane.T)
 
             if self.depth_regression_mode == 'cam2obj_dist':
                 # Start with rescaling the whole translation vector.
