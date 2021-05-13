@@ -523,20 +523,22 @@ class Generator(keras.utils.Sequence):
             augmented_mask = cv2.warpAffine(mask, sR_inplane_2d_mat, (width, height), flags = cv2.INTER_NEAREST) #use nearest neighbor interpolation to keep valid mask values
         else:
             # Express tilt rotation with 3D rotation vector / matrix. Rotation is around an axis in the principal plane z = 0.
+            assert tilt_axis.shape == (2,)
+            tilt_axis = np.concatenate([tilt_axis, np.zeros((1,))], axis=0) # 3D lift to the plane z = 0
             assert tilt_axis.shape == (3,)
 
             R_tilt, _ = cv2.Rodrigues(tilt_axis * tilt_angle / 180. * math.pi)
             Sigma = np.diag([scale, scale, 1])
             K = camera_matrix
             assert K.shape == (3, 3)
-            H_tilt = K @ R_tilt @ np.inv(K)
+            H_tilt = K @ R_tilt @ np.linalg.inv(K)
 
             # Combine everything into a single homography warping:
             H = H_tilt @ np.concatenate([sR_inplane_2d_mat, np.array([[0, 0, 1]])], axis=0)
             assert H.shape == (3, 3)
-            augmented_img = cv2.warpPerspective(augmented_img, H, (width, height))
+            augmented_img = cv2.warpPerspective(img, H, (width, height))
             #append the affine transformation also to the mask to extract the augmented bbox afterwards
-            augmented_mask = cv2.warpPerspective(augmented_mask, H, (width, height), flags = cv2.INTER_NEAREST) #use nearest neighbor interpolation to keep valid mask values
+            augmented_mask = cv2.warpPerspective(mask, H, (width, height), flags = cv2.INTER_NEAREST) #use nearest neighbor interpolation to keep valid mask values
 
         #check if complete mask is zero
         _, is_valid_augmentation = self.get_bbox_from_mask(augmented_mask)
