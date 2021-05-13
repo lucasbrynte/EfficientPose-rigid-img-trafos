@@ -50,6 +50,7 @@ class Generator(keras.utils.Sequence):
             use_6DoF_augmentation = False,
             scale_6DoF_augmentation = (0.7, 1.3),
             inplane_angle_6DoF_augmentation = (0, 360),
+            tilt_angle_6DoF_augmentation = (0, 0),
             chance_no_augmentation = 0.02,
             translation_scale_norm = 1000.0,
             points_for_shape_match_loss = 500,
@@ -98,6 +99,7 @@ class Generator(keras.utils.Sequence):
         self.points_for_shape_match_loss = points_for_shape_match_loss
         self.scale_6DoF_augmentation = scale_6DoF_augmentation
         self.inplane_angle_6DoF_augmentation = inplane_angle_6DoF_augmentation
+        self.tilt_angle_6DoF_augmentation = tilt_angle_6DoF_augmentation
         if self.use_colorspace_augmentation:
             self.rand_aug = RandAugment(n = (1, 3), m = (1, 14))
         else:
@@ -389,12 +391,18 @@ class Generator(keras.utils.Sequence):
         scale = random.random() * scale_range + min_scale #standard is scale between [0.7, 1.3]
         inplane_angle_range, min_inplane_angle = self.get_inplane_angle_6DoF_augmentation_parameter()
         inplane_angle = random.random() * inplane_angle_range + min_inplane_angle #standard is angle between [0, 360]
+        tilt_angle_range, min_tilt_angle = self.get_tilt_angle_6DoF_augmentation_parameter()
+        tilt_angle = random.random() * tilt_angle_range + min_tilt_angle #standard is angle between [0, 0]
+        tmp_inplane_alpha = random.random() * 2 * math.pi
+        tilt_axis = np.array([np.cos(tmp_inplane_alpha), np.sin(tmp_inplane_alpha)])
         
         augmented_img, augmented_rotation_vector, augmented_translation_vector, augmented_bbox, still_valid_annos, is_valid_augmentation = self.augmentation_6DoF(img = img,
                                                                                                                                                 mask = mask,
                                                                                                                                                 rotation_matrix_annos = rotation_matrix_annos,
                                                                                                                                                 translation_vector_annos = translation_vector_annos,
                                                                                                                                                 inplane_angle = inplane_angle,
+                                                                                                                                                tilt_angle = tilt_angle,
+                                                                                                                                                tilt_axis = tilt_axis,
                                                                                                                                                 scale = scale,
                                                                                                                                                 camera_matrix = camera_matrix,
                                                                                                                                                 mask_values = mask_values)
@@ -434,7 +442,7 @@ class Generator(keras.utils.Sequence):
         return augmented_img, annotations
     
     
-    def augmentation_6DoF(self, img, mask, rotation_matrix_annos, translation_vector_annos, inplane_angle, scale, camera_matrix, mask_values):
+    def augmentation_6DoF(self, img, mask, rotation_matrix_annos, translation_vector_annos, inplane_angle, tilt_angle, tilt_axis, scale, camera_matrix, mask_values):
         """ Computes the 6D augmentation.
         Args:
             img: The image to augment
@@ -442,6 +450,8 @@ class Generator(keras.utils.Sequence):
             rotation_matrix_annos: numpy array with shape (num_annotations, 3, 3) which contains the ground truth rotation matrix for each annotated object in the image
             translation_vector_annos: numpy array with shape (num_annotations, 3) which contains the ground truth translation vectors for each annotated object in the image
             inplane_angle: rotate the image with the given angle
+            tilt_angle: simulate rotating the camera around an axis in the principal plane with the given angle
+            tilt_axis: rotation axis for tilting (should be in principal plane, and provided with x and y components only: shape (2,))
             scale: scale the image with the given scale
             camera_matrix: The camera matrix of the example
             mask_values: numpy array of shape (num_annotations,) containing the segmentation mask value of each annotated object
@@ -457,6 +467,12 @@ class Generator(keras.utils.Sequence):
             assert self.depth_regression_mode == 'cam2obj_dist'
         else:
             assert self.depth_regression_mode == 'zcoord'
+
+        tilt_enabled = not np.isclose(tilt_angle, 0)
+        if self.radial_arctan_prewarped_images:
+            # In this case, tilt augmentation is not implemented.
+            # The purpose of the combination is unclear, since the prewarping + translational equivariance serves a very similar purpose to tilt augmentations.
+            assert not tilt_enabled
 
         #get the center point from the intrinsic camera matrix
         cx = camera_matrix[0, 2]
@@ -481,20 +497,46 @@ class Generator(keras.utils.Sequence):
         height, width, _ = img.shape
         #rotate and scale image
 
-        ########### IN-PLANE ROTATION ###########
-        R_inplane_2d_mat = cv2.getRotationMatrix2D((cx, cy), -inplane_angle, scale)
+        # The augmentation is defined as the follow chain:
+        # (1) Image rescaling / object depth augmentation (this is approximative and comes in two versions)
+        # (2) In-plane rotation
+        # (3) Tilt rotation (corresponding to homography transformation in image plane)
+
+        # Note that in the image, in-plane rotation and scaling commute.
+        # Hence, in the case without tilting, the order of the transformations is arbitrary.
+        # OpenCV yields a single 2x3 similarity matrix to account for both:
+        # Note: A positive (counter-clockwise) rotation around the z-axis, is a negative (clockwise) rotation in the image plane (which is around the negative z-axis).
+        sR_inplane_2d_mat = cv2.getRotationMatrix2D((cx, cy), -inplane_angle, scale)
         # try:
-        #     R_inplane_2d_mat = cv2.getRotationMatrix2D((cx, cy), -inplane_angle, scale)
+        #     sR_inplane_2d_mat = cv2.getRotationMatrix2D((cx, cy), -inplane_angle, scale)
         # except:
-        #     R_inplane_2d_mat = cv2.getRotationMatrix2D(np.array([cx, cy]), -inplane_angle, scale)
-        augmented_img = cv2.warpAffine(img, R_inplane_2d_mat, (width, height))
-        #append the affine transformation also to the mask to extract the augmented bbox afterwards
-        augmented_mask = cv2.warpAffine(mask, R_inplane_2d_mat, (width, height), flags = cv2.INTER_NEAREST) #use nearest neighbor interpolation to keep valid mask values
+        #     sR_inplane_2d_mat = cv2.getRotationMatrix2D(np.array([cx, cy]), -inplane_angle, scale)
 
         # Express in-plane rotation with 3D rotation vector / matrix. Rotation is around the z-axis in the camera coordinate system.
         inplane_rotation_vector = np.zeros((3,))
         inplane_rotation_vector[2] = inplane_angle / 180. * math.pi
         R_inplane, _ = cv2.Rodrigues(inplane_rotation_vector)
+
+        if not tilt_enabled:
+            augmented_img = cv2.warpAffine(img, sR_inplane_2d_mat, (width, height))
+            #append the affine transformation also to the mask to extract the augmented bbox afterwards
+            augmented_mask = cv2.warpAffine(mask, sR_inplane_2d_mat, (width, height), flags = cv2.INTER_NEAREST) #use nearest neighbor interpolation to keep valid mask values
+        else:
+            # Express tilt rotation with 3D rotation vector / matrix. Rotation is around an axis in the principal plane z = 0.
+            assert tilt_axis.shape == (3,)
+
+            R_tilt, _ = cv2.Rodrigues(tilt_axis * tilt_angle / 180. * math.pi)
+            Sigma = np.diag([scale, scale, 1])
+            K = camera_matrix
+            assert K.shape == (3, 3)
+            H_tilt = K @ R_tilt @ np.inv(K)
+
+            # Combine everything into a single homography warping:
+            H = H_tilt @ np.concatenate([sR_inplane_2d_mat, np.array([[0, 0, 1]])], axis=0)
+            assert H.shape == (3, 3)
+            augmented_img = cv2.warpPerspective(augmented_img, H, (width, height))
+            #append the affine transformation also to the mask to extract the augmented bbox afterwards
+            augmented_mask = cv2.warpPerspective(augmented_mask, H, (width, height), flags = cv2.INTER_NEAREST) #use nearest neighbor interpolation to keep valid mask values
 
         #check if complete mask is zero
         _, is_valid_augmentation = self.get_bbox_from_mask(augmented_mask)
@@ -516,12 +558,13 @@ class Generator(keras.utils.Sequence):
                 still_valid_annos[i] = False
                 continue
         
-            #get the final augmentation rotation
-            augmented_rotation_matrix = np.dot(R_inplane, rotation_matrix_annos[i, :, :])
+            # Initialize the final rotation annotation, as it was before augmentation
+            augmented_rotation_matrix = np.copy(rotation_matrix_annos[i, :, :])
 
-            #also rotate the gt translation vector first and then adjust Tz with the given augmentation scale
-            augmented_translation_vector = np.dot(np.copy(translation_vector_annos[i, :]), R_inplane.T)
+            # Also initialize the final translation annotation
+            augmented_translation_vector = np.copy(translation_vector_annos[i, :])
 
+            ##### STEP 1: Apply scaling on pose annotations #####
             if self.depth_regression_mode == 'cam2obj_dist':
                 # Start with rescaling the whole translation vector.
                 # This corresponds to translation along the viewing ray, rather than just along z direction like in the other case.
@@ -548,6 +591,15 @@ class Generator(keras.utils.Sequence):
             else:
                 assert self.depth_regression_mode == 'zcoord'
                 augmented_translation_vector[2] /= scale
+
+            ##### STEP 2: Apply in-plane rotation on pose annotations #####
+            augmented_rotation_matrix = np.dot(R_inplane, augmented_rotation_matrix)
+            augmented_translation_vector = np.dot(augmented_translation_vector, R_inplane.T)
+
+            ##### STEP 3: Apply tilt rotation on pose annotations #####
+            if tilt_enabled:
+                augmented_rotation_matrix = np.dot(R_tilt, augmented_rotation_matrix)
+                augmented_translation_vector = np.dot(augmented_translation_vector, R_tilt.T)
 
             augmented_rotation_vector, _ = cv2.Rodrigues(augmented_rotation_matrix)
 
@@ -587,6 +639,18 @@ class Generator(keras.utils.Sequence):
         assert not max_inplane_angle < min_inplane_angle
         inplane_angle_range = max_inplane_angle - min_inplane_angle
         return inplane_angle_range, min_inplane_angle
+
+
+    def get_tilt_angle_6DoF_augmentation_parameter(self):
+        """ Returns the 6D augmentation config parameter.
+        Returns:
+            tilt_angle_range: Float representing the range of the 6D augmentation angle
+            min_tilt_angle: Float representing the minimum angle of the 6D augmentation
+        """
+        min_tilt_angle, max_tilt_angle = self.tilt_angle_6DoF_augmentation
+        assert not max_tilt_angle < min_tilt_angle
+        tilt_angle_range = max_tilt_angle - min_tilt_angle
+        return tilt_angle_range, min_tilt_angle
 
 
     def get_bbox_from_mask(self, mask, mask_value = None):

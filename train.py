@@ -81,6 +81,7 @@ def parse_args(args):
     parser.add_argument('--no-6dof-augmentation', help = 'Do not use 6DoF augmentation', action = 'store_true')
     parser.add_argument('--scale-6dof-augmentation', help = 'Range from which to uniformly sample scales for 6DoF augmentation. Default: "--scale-6dof-augmentation 0.7 1.3"', default = (0.7, 1.3), type = float, nargs=2)
     parser.add_argument('--inplane-angle-6dof-augmentation', help = 'Range from which to uniformly sample angles for in-plane rotation for 6DoF augmentation. Default: "--inplane-angle-6dof-augmentation 0 360"', default = (0, 360), type = float, nargs=2)
+    parser.add_argument('--tilt-angle-6dof-augmentation', help = 'Range from which to uniformly sample angles for tilt rotation for 6DoF augmentation. Default: "--tilt-angle-6dof-augmentation 0 360"', default = (0, 0), type = float, nargs=2)
     parser.add_argument('--phi', help = 'Hyper parameter phi', default = 0, type = int, choices = (0, 1, 2, 3, 4, 5, 6))
     parser.add_argument('--gpu', help = 'Id of the GPU to use (as reported by nvidia-smi).')
     parser.add_argument('--epochs', help = 'Number of epochs to train.', type = int, default = 500)
@@ -390,6 +391,7 @@ def create_generators(args):
             use_6DoF_augmentation = not args.no_6dof_augmentation,
             scale_6DoF_augmentation = args.scale_6dof_augmentation,
             inplane_angle_6DoF_augmentation = args.inplane_angle_6dof_augmentation,
+            tilt_angle_6DoF_augmentation = args.tilt_angle_6dof_augmentation,
             depth_regression_mode = args.depth_regression_mode,
             radial_arctan_prewarped_images = args.radial_arctan_prewarped_images,
             one_based_indexing_for_prewarp = args.one_based_indexing_for_prewarp,
@@ -421,6 +423,7 @@ def create_generators(args):
             use_6DoF_augmentation = not args.no_6dof_augmentation,
             scale_6DoF_augmentation = args.scale_6dof_augmentation,
             inplane_angle_6DoF_augmentation = args.inplane_angle_6dof_augmentation,
+            tilt_angle_6DoF_augmentation = args.tilt_angle_6dof_augmentation,
             depth_regression_mode = args.depth_regression_mode,
             radial_arctan_prewarped_images = args.radial_arctan_prewarped_images,
             one_based_indexing_for_prewarp = args.one_based_indexing_for_prewarp,
