@@ -491,8 +491,8 @@ class Generator(keras.utils.Sequence):
             )
             cx = cx.squeeze()
             cy = cy.squeeze()
-            assert cx.shape == ()
-            assert cy.shape == ()
+        assert cx.shape == ()
+        assert cy.shape == ()
 
         height, width, _ = img.shape
         #rotate and scale image
@@ -506,11 +506,18 @@ class Generator(keras.utils.Sequence):
         # Hence, in the case without tilting, the order of the transformations is arbitrary.
         # OpenCV yields a single 2x3 similarity matrix to account for both:
         # Note: A positive (counter-clockwise) rotation around the z-axis, is a negative (clockwise) rotation in the image plane (which is around the negative z-axis).
-        sR_inplane_2d_mat = cv2.getRotationMatrix2D((cx, cy), -inplane_angle, scale)
-        # try:
-        #     sR_inplane_2d_mat = cv2.getRotationMatrix2D((cx, cy), -inplane_angle, scale)
-        # except:
-        #     sR_inplane_2d_mat = cv2.getRotationMatrix2D(np.array([cx, cy]), -inplane_angle, scale)
+        # If the provided angle is positive, the "getRotationMatrix2D" function indeed returns a matrix which yields "counter-clockwise" rotations, but in a negatively oriented coordinate system such as the image plane.
+        # The same matrix would result in a clockwise rotation in a positively oriented frame (such as the image plane seen from behind).
+        # Consequently, it should actually be the case that [sR_inplane_2d_mat; 0 0 1] = K*R_inplane*Sigma*inv(K), where Sigma is the scaling.
+        try:
+            # Note, this should work!
+            sR_inplane_2d_mat = cv2.getRotationMatrix2D((float(cx), float(cy)), -inplane_angle, scale)
+        except:
+            # While this is unexpected!
+            try:
+                sR_inplane_2d_mat = cv2.getRotationMatrix2D((cx, cy), -inplane_angle, scale)
+            except:
+                sR_inplane_2d_mat = cv2.getRotationMatrix2D(np.array([cx, cy]), -inplane_angle, scale)
 
         # Express in-plane rotation with 3D rotation vector / matrix. Rotation is around the z-axis in the camera coordinate system.
         inplane_rotation_vector = np.zeros((3,))
