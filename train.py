@@ -109,9 +109,8 @@ def parse_args(args):
     parser.add_argument('--rot-target-frame-of-ref', help = 'Controls what frame of reference to use for the target orientation to be estimated. Choose from: "cam" and "cam_aligned_towards_obj".', type = str, default = 'cam')
 
     parser.add_argument('--radial-arctan-prewarped-images', help = 'Indicates that input images have been subject to a warp operation, where every point has been transformed such that the radial distance r to the principal point is replaced by arctan(r), resulting in an equiangular grid, in the sense of camera rotations.', action = 'store_true')
-    parser.add_argument('--one-based-indexing-for-prewarp', help = 'When prewarping the images, one based indexing rather than zero based indexing was assumed.', action = 'store_true')
-    parser.add_argument('--image-width', help = 'Image width', required = False, type = int)
-    parser.add_argument('--image-height', help = 'Image height', required = False, type = int)
+    parser.add_argument('--image-width', help = 'Image width. Required by, and to be used along with --radial-arctan-prewarped-images.', required = False, type = int)
+    parser.add_argument('--image-height', help = 'Image height. Required by, and to be used along with --radial-arctan-prewarped-images.', required = False, type = int)
 
     print(vars(parser.parse_args(args)))
     args = parser.parse_args(args)
@@ -167,7 +166,7 @@ def main(args = None):
                                                               num_rotation_parameters = num_rotation_parameters,
                                                               depth_regression_mode = args.depth_regression_mode,
                                                               radial_arctan_prewarped_images = args.radial_arctan_prewarped_images,
-                                                              one_based_indexing_for_prewarp = args.one_based_indexing_for_prewarp,
+                                                              one_based_indexing_for_prewarp = False,
                                                               original_image_shape = (args.image_height, args.image_width),
                                                           )
     print("Done!")
@@ -398,7 +397,7 @@ def create_generators(args):
             tilt_angle_6DoF_augmentation = args.tilt_angle_6dof_augmentation,
             depth_regression_mode = args.depth_regression_mode,
             radial_arctan_prewarped_images = args.radial_arctan_prewarped_images,
-            one_based_indexing_for_prewarp = args.one_based_indexing_for_prewarp,
+            one_based_indexing_for_prewarp = False,
             original_image_shape = (args.image_height, args.image_width),
             **common_args
         )
@@ -414,7 +413,7 @@ def create_generators(args):
             use_6DoF_augmentation = False,
             depth_regression_mode = args.depth_regression_mode,
             radial_arctan_prewarped_images = args.radial_arctan_prewarped_images,
-            one_based_indexing_for_prewarp = args.one_based_indexing_for_prewarp,
+            one_based_indexing_for_prewarp = False,
             original_image_shape = (args.image_height, args.image_width),
             **common_args
         )
@@ -430,7 +429,7 @@ def create_generators(args):
             tilt_angle_6DoF_augmentation = args.tilt_angle_6dof_augmentation,
             depth_regression_mode = args.depth_regression_mode,
             radial_arctan_prewarped_images = args.radial_arctan_prewarped_images,
-            one_based_indexing_for_prewarp = args.one_based_indexing_for_prewarp,
+            one_based_indexing_for_prewarp = False,
             original_image_shape = (args.image_height, args.image_width),
             **common_args
         )
@@ -445,7 +444,7 @@ def create_generators(args):
             use_6DoF_augmentation = False,
             depth_regression_mode = args.depth_regression_mode,
             radial_arctan_prewarped_images = args.radial_arctan_prewarped_images,
-            one_based_indexing_for_prewarp = args.one_based_indexing_for_prewarp,
+            one_based_indexing_for_prewarp = False,
             original_image_shape = (args.image_height, args.image_width),
             **common_args
         )
