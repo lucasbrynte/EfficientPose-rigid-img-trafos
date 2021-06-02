@@ -50,6 +50,7 @@ from tensorflow.keras.optimizers import Adam
 from model import build_EfficientPose
 from losses import smooth_l1, focal, transformation_loss
 from efficientnet import BASE_WEIGHTS_PATH, WEIGHTS_HASHES
+from utils.misc import NumpyEncoder
 
 from custom_load_weights import custom_load_weights
 
@@ -241,7 +242,7 @@ def main(args = None):
     )
     if args.history_dump_path is not None:
         with open(args.history_dump_path, 'w') as f:
-            json.dump(history.history, f)
+            json.dump(history.history, f, cls=NumpyEncoder)
     return history
 
 
