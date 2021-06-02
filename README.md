@@ -1,4 +1,47 @@
-# EfficientPose
+# EfficientPose with modifications for Natural Image Transformations
+This code is a modification of the EfficientPose repository found [on GitHub](https://github.com/ybkscht/EfficientPose).
+This README is a modification of the original EfficientPose README, which is reproduced in its entirety further down.
+
+To be able to run the experiments for the Natural Image Transformations paper, use the original [installation instructions](#installation) from the EfficientPose, and use the same [datasets and pretrained weights](#dataset-and-pretrained-weights).
+
+## Preprocessing
+In order to train the PY-equivariant networks, you first need to preprocess the images, transforming them to the PY-domain, by running the Matlab script `preprocessing/warp_all_imgs.m`.
+Before running, make sure to configure the `data_path` variable (set internally), such that it points to the `Linemod_preprocessed` directory (which you should have retrieved when following the dataset download instructions).
+The result of running this preprocessing script is that next to the sub-directories `rgb`, `mask`, and `merged_masks` of the datasets, you should now have gotten corresponding directories next to them, with a `_arctan_warped` suffix added to their corresponding names, containing the images warped to the PY-domain.
+
+## Training, evaluation, and modified options
+Training and evaluation is carried out in essentially the same way as in the original repository, as described [here](#training) and [here](#evaluating).
+There are however a number of alterations to the available options.
+As the training script also carries out evaluation, the evaluation script is optional.
+
+### Additional options shared between training and evaluation
+- `--radial-arctan-prewarped-images` : Indicates that input images have been transformed to the PY-domain. This is not carried out online: prewarping is necessary, as described [here](#preprocessing).
+- `--image-width` : Image width. Required by, and to be used along with `--radial-arctan-prewarped-images`.
+- `--image-height` : Image height. Required by, and to be used along with `--radial-arctan-prewarped-images`.
+- `--depth-regression-mode` : Controls what to be regressed in order to perform object depth estimation. Choose from: `zcoord` and `cam2obj_dist`. Default: `zcoord`.
+- `--rot-target-frame-of-ref` : Controls what frame of reference to use for the target orientation to be estimated. Choose from: `cam` and `cam_aligned_towards_obj`. Default: `cam`.
+
+### Additional options for training
+Geometric data augmentations: (including our proposed "tilt" augmentations, referred to as RHaug in the paper)
+- `--scale-6dof-augmentation` : Range from which to uniformly sample scales for 6DoF augmentation. Default: `--scale-6dof-augmentation 0.7 1.3`. Default: `(0.7, 1.3)`.
+- `--inplane-angle-6dof-augmentation` : Range from which to uniformly sample angles for in-plane rotation for 6DoF augmentation. Provide 2 arguments, space separated, e.g. `--inplane-angle-6dof-augmentation 0 360`. Default: `(0, 360)`.
+- `--tilt-angle-6dof-augmentation` : Range from which to uniformly sample angles for tilt rotation for 6DoF augmentation. Provide 2 arguments, space separated, e.g. `--tilt-angle-6dof-augmentation 0 360`. Default: `(0, 0)`.
+
+Checkpoints and validation:
+- `--validation-interval` : Validation interval (\#epochs). Originally, this was achieved by duplicating the dataset 10 times in each epoch, but now there is instead a dedicated option. Default: `10`.
+- `--snapshot-interval` : Snapshot interval (\#epochs). If provided, not only the best snapshot is saved, but also snapshots with the given interval. In order to avoid cherry-picking the best-performing model across all training epochs for evaluation, such an interval should be provided. Optional.
+
+Logging:
+- `--csv-log-path` : Path to stream results as CSV. Optional.
+- `--history-dump-path` : Path to dump final history dictionary as JSON. Optional.
+
+Finally, note that the original `--steps` option is removed.
+Instead, the number of batches per epoch is automatically inferred from the datasets.
+Furthermore, reshuffling is now carried out at every epoch.
+
+
+
+# \[THE ORIGINAL README:\] EfficientPose
 This is the official implementation of [EfficientPose](https://arxiv.org/abs/2011.04307). 
 We based our work on the Keras EfficientDet implementation [xuannianz/EfficientDet](https://github.com/xuannianz/EfficientDet) which again builds up on the great Keras RetinaNet implementation [fizyr/keras-retinanet](https://github.com/fizyr/keras-retinanet), the official EfficientDet implementation [google/automl](https://github.com/google/automl) and [qubvel/efficientnet](https://github.com/qubvel/efficientnet).
 
