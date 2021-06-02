@@ -535,7 +535,10 @@ class Generator(keras.utils.Sequence):
             assert tilt_axis.shape == (3,)
 
             R_tilt, _ = cv2.Rodrigues(tilt_axis * tilt_angle / 180. * math.pi)
-            Sigma = np.diag([scale, scale, 1])
+            # Sigma = np.diag([scale, scale, 1])
+            # Note: One could have considered to undo the effects of scaling, by taking a matrix "Sigma" into account, and include Sigma in K when applying R_tilt.
+            # However, it is not entirely obvious how to best handle this part, as Sigma results only in an approximative rigid transformation to start with.
+            # Whether to undo Sigma or not before applying R_tilt boils down to whether the scaled or unscaled image is regarded as the observation upon which we would like to apply the tilt augmentation.
             K = camera_matrix
             assert K.shape == (3, 3)
             H_tilt = K @ R_tilt @ np.linalg.inv(K)
