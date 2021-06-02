@@ -318,31 +318,27 @@ class CalculateTxTy(keras.layers.Layer):
         y = inputs[:, :, 1] / image_scale
 
         if radial_arctan_prewarped_images:
-            assert depth_regression_mode == 'cam2obj_dist'
-            cam2obj_dist = inputs[:, :, 2] * tz_scale
             x, y = self.radial_tangent_transform(x, y, fx, fy, px, py, one_based_indexing_for_prewarp, original_image_shape)
             # Now, coordinates are in original (unwarped) image plane. Unnormalized (pixels).
 
-            # Apply inv(K)
-            x = (x - px) / fx
-            y = (y - py) / fy
+        # Apply inv(K)
+        x = (x - px) / fx
+        y = (y - py) / fy
+
+        if depth_regression_mode == 'cam2obj_dist':
             # Define z coordinate such that (x,y,z) makes a 3D point on the image plane z=1.
             z = tf.ones_like(x)
             # Calculate the norm of that point:
             tmp_norm = tf.sqrt(x**2 + y**2 + z**2)
 
             # Now, rescale all 3 coordinates to perform backprojection, given the cam2obj distance.
+            cam2obj_dist = inputs[:, :, 2] * tz_scale
             tx = x / tmp_norm * cam2obj_dist
             ty = y / tmp_norm * cam2obj_dist
             tz = z / tmp_norm * cam2obj_dist
         else:
             assert depth_regression_mode == 'zcoord'
             tz = inputs[:, :, 2] * tz_scale
-
-            # Apply inv(K)
-            x = (x - px) / fx
-            y = (y - py) / fy
-
             tx = tf.math.multiply(x, tz)
             ty = tf.math.multiply(y, tz)
 

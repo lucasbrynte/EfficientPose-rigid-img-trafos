@@ -463,10 +463,10 @@ class Generator(keras.utils.Sequence):
             still_valid_annos: numpy boolean array of shape (num_annotations,) indicating if the augmented annotation of each object is still valid or not (object rotated out of the image for example)
             is_valid_augmentation: Boolean indicating wheter there is at least one valid annotated object after the augmentation
         """
-        if self.radial_arctan_prewarped_images:
-            assert self.depth_regression_mode == 'cam2obj_dist'
-        else:
-            assert self.depth_regression_mode == 'zcoord'
+        # if self.radial_arctan_prewarped_images:
+        #     assert self.depth_regression_mode == 'cam2obj_dist'
+        # else:
+        #     assert self.depth_regression_mode == 'zcoord'
 
         tilt_enabled = not np.isclose(tilt_angle, 0)
         if self.radial_arctan_prewarped_images:
@@ -477,7 +477,8 @@ class Generator(keras.utils.Sequence):
         #get the center point from the intrinsic camera matrix
         cx = camera_matrix[0, 2]
         cy = camera_matrix[1, 2]
-        if self.depth_regression_mode == 'cam2obj_dist':
+        if self.radial_arctan_prewarped_images:
+        # if self.depth_regression_mode == 'cam2obj_dist':
             # Transform principal point, according to warping.
             cx, cy = radial_arctan_transform(
                 cx.reshape((1,1)), # x
