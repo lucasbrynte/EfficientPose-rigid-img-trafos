@@ -46,6 +46,7 @@ class Generator(keras.utils.Sequence):
             phi = 0,
             image_sizes = (512, 640, 768, 896, 1024, 1280, 1408),
             train = True,
+            subset_size = None,
             use_colorspace_augmentation = False,
             use_6DoF_augmentation = False,
             scale_6DoF_augmentation = (0.7, 1.3),
@@ -82,6 +83,7 @@ class Generator(keras.utils.Sequence):
             shuffle_groups: If True, shuffles the groups each epoch.
         """
         self.batch_size = int(batch_size)
+        self.subset_size = subset_size
         self.group_method = group_method
         self.shuffle_groups = shuffle_groups
         self.image_size = image_sizes[phi]
@@ -992,6 +994,11 @@ class Generator(keras.utils.Sequence):
         # determine the order of the images
 
         order = list(range(self.size()))
+        if self.subset_size is not None and self.subset_size > 0:
+            # Sample a fixed subset of the training set.
+            # Since we want a fixed subset, we always use the same seed for drawing the sample.
+            rng = np.random.default_rng(12345)
+            order = rng.choice(order, size=(self.subset_size,), replace=False)
         if self.group_method == 'random':
             random.shuffle(order)
         elif self.group_method == 'ratio':

@@ -84,6 +84,7 @@ def parse_args(args):
     parser.add_argument('--scale-6dof-augmentation', help = 'Range from which to uniformly sample scales for 6DoF augmentation. Default: "--scale-6dof-augmentation 0.7 1.3"', default = (0.7, 1.3), type = float, nargs=2)
     parser.add_argument('--inplane-angle-6dof-augmentation', help = 'Range from which to uniformly sample angles for in-plane rotation for 6DoF augmentation. Default: "--inplane-angle-6dof-augmentation 0 360"', default = (0, 360), type = float, nargs=2)
     parser.add_argument('--tilt-angle-6dof-augmentation', help = 'Range from which to uniformly sample angles for tilt rotation for 6DoF augmentation. Default: "--tilt-angle-6dof-augmentation 0 360"', default = (0, 0), type = float, nargs=2)
+    parser.add_argument('--train-subset-size', help = 'Reduce the training set to a random subset of the given size.', default = None, type = int)
     parser.add_argument('--phi', help = 'Hyper parameter phi', default = 0, type = int, choices = (0, 1, 2, 3, 4, 5, 6))
     parser.add_argument('--gpu', help = 'Id of the GPU to use (as reported by nvidia-smi).')
     parser.add_argument('--epochs', help = 'Number of epochs to train.', type = int, default = 5000)
@@ -388,6 +389,7 @@ def create_generators(args):
         train_generator = LineModGenerator(
             args.linemod_path,
             args.object_id,
+            subset_size = args.train_subset_size,
             rotation_representation = args.rotation_representation,
             use_colorspace_augmentation = not args.no_color_augmentation,
             use_6DoF_augmentation = not args.no_6dof_augmentation,
@@ -420,6 +422,7 @@ def create_generators(args):
         from generators.occlusion import OcclusionGenerator
         train_generator = OcclusionGenerator(
             args.occlusion_path,
+            subset_size = args.train_subset_size,
             rotation_representation = args.rotation_representation,
             use_colorspace_augmentation = not args.no_color_augmentation,
             use_6DoF_augmentation = not args.no_6dof_augmentation,
