@@ -43,6 +43,7 @@ import os
 import sys
 import json
 
+import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras.optimizers import Adam
@@ -85,6 +86,10 @@ def parse_args(args):
     parser.add_argument('--inplane-angle-6dof-augmentation', help = 'Range from which to uniformly sample angles for in-plane rotation for 6DoF augmentation. Default: "--inplane-angle-6dof-augmentation 0 360"', default = (0, 360), type = float, nargs=2)
     parser.add_argument('--tilt-angle-6dof-augmentation', help = 'Range from which to uniformly sample angles for tilt rotation for 6DoF augmentation. Default: "--tilt-angle-6dof-augmentation 0 360"', default = (0, 0), type = float, nargs=2)
     parser.add_argument('--train-subset-size', help = 'Reduce the training set to a random subset of the given size.', default = None, type = int)
+    parser.add_argument('--train-subset-epoch-increase-factor',
+        help = 'When training with a reduced subset of training data, this factor, when > 1, may be used to increase the number of epochs, to reduce the effective reduction of total training batches. The total number of epochs will however be capped such that the total number of batches will not be more than when using all training data. This maximum number can also be enforced directly, by setting the factor to 0.',
+        default = 1, type = float,
+    )
     parser.add_argument('--phi', help = 'Hyper parameter phi', default = 0, type = int, choices = (0, 1, 2, 3, 4, 5, 6))
     parser.add_argument('--gpu', help = 'Id of the GPU to use (as reported by nvidia-smi).')
     parser.add_argument('--epochs', help = 'Number of epochs to train.', type = int, default = 5000)
@@ -149,6 +154,20 @@ def main(args = None):
     print("\nCreating the Generators...")
     train_generator, validation_generator = create_generators(args)
     print("Done!")
+
+    if args.train_subset_size is not None and args.train_subset_size > 0:
+        n_epochs_for_stable_n_batches = np.ceil(args.epochs * len(train_generator) / args.train_subset_size).astype(int)
+        if args.train_subset_epoch_increase_factor == 0:
+            args.epochs = n_epochs_for_stable_n_batches
+            assert args.epochs == n_epochs_for_stable_n_batches
+        elif args.train_subset_epoch_increase_factor > 1:
+            args.epochs = min(n_epochs_for_stable_n_batches, np.ceil(args.epochs * args.train_subset_epoch_increase_factor).astype(int))
+        else:
+            assert args.train_subset_epoch_increase_factor == 1, 'Epoch increase factor has to be either >= 1, or 0, where the latter ensures an unchanged total number of batches, as compared to training on the whole training set.'
+        # Finally, increase the number of epochs enough to ensure that a checkpoint will be saved for the last epoch.
+        args.epochs += (-args.epochs) % args.snapshot_interval
+        assert args.epochs % args.snapshot_interval == 0
+
     
     num_rotation_parameters = train_generator.get_num_rotation_parameters()
     num_classes = train_generator.num_classes()
