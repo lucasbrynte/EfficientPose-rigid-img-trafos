@@ -156,7 +156,7 @@ def main(args = None):
     print("Done!")
 
     if args.train_subset_size is not None and args.train_subset_size > 0:
-        n_epochs_for_stable_n_batches = np.ceil(args.epochs * len(train_generator) / args.train_subset_size).astype(int)
+        n_epochs_for_stable_n_batches = np.ceil(args.epochs * train_generator.size() / args.train_subset_size).astype(int)
         if args.train_subset_epoch_increase_factor == 0:
             args.epochs = n_epochs_for_stable_n_batches
             assert args.epochs == n_epochs_for_stable_n_batches
