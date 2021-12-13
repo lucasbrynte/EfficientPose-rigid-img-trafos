@@ -115,6 +115,7 @@ def parse_args(args):
     print(vars(parser.parse_args(args)))
     args = parser.parse_args(args)
     assert (args.snapshot_interval % args.validation_interval == 0), 'snapshot_interval {} has to be, but is not, a multiple of validation_interval {}.'.format(args.snapshot_interval, args.validation_interval)
+    assert (args.epochs % args.snapshot_interval == 0), '#epochs {} has to be, but is not, a multiple of snapshot_interval {}.'.format(args.epochs, args.snapshot_interval)
 
     # # Warped / unwarped images matters as for what depth estimation mode is reasonable.
     # if args.radial_arctan_prewarped_images:
