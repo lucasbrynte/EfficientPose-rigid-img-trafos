@@ -1,8 +1,8 @@
-# EfficientPose with modifications for Natural Image Transformations
+# EfficientPose with modifications for Rigidity Preserving Image Transformations
 This code is a modification of the EfficientPose repository found [on GitHub](https://github.com/ybkscht/EfficientPose).
 This README is a modification of the original EfficientPose README, which is reproduced in its entirety further down.
 
-To be able to run the experiments for the Natural Image Transformations paper, use the original [installation instructions](#installation) from the EfficientPose, and use the same [datasets and pretrained weights](#dataset-and-pretrained-weights).
+To be able to run the experiments for the Rigidity Preserving Image Transformations paper, use the original [installation instructions](#installation) from the EfficientPose, and use the same [datasets and pretrained weights](#dataset-and-pretrained-weights).
 
 ## Preprocessing
 In order to train the PY-equivariant networks, you first need to preprocess the images, transforming them to the PY-domain, by running the Matlab script `preprocessing/warp_all_imgs.m`.
