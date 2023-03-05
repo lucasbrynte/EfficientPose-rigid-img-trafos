@@ -132,6 +132,16 @@ def parse_args(args):
     #     assert args.depth_regression_mode == 'zcoord'
     #     # assert args.rot_target_frame_of_ref == 'cam'
 
+    # # Warped / unwarped images matters as for what depth estimation mode as well as which reference frame for the rotation estimation is reasonable.
+    # if args.radial_arctan_prewarped_images:
+    #     # If having arctan-warped the images, the 2D extent of the object surface is roughly proportional to the end-to-end angle between viewing rays, and inversely proportional to the distance between camera and object.
+    #     assert args.depth_regression_mode == 'cam2obj_dist'
+    #     assert args.rot_target_frame_of_ref == 'cam_aligned_towards_obj'
+    # else:
+    #     # For a regular pinhole camera, the 2D extent of the object surface is roughly proportional to the 3D extent of the object in the X/Y directions (scaled with focal length), and inversely proportional to the 3D Z coordinate of the object (in the camera coordinate system).
+    #     assert args.depth_regression_mode == 'zcoord'
+    #     assert args.rot_target_frame_of_ref == 'cam'
+
     return args
 
 
